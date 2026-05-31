@@ -2,7 +2,7 @@
 
 Gerador de questões de POO para o repositório arcade.
 
-Você passa um contexto (cassino, aeroporto, maratona), um nível e um tema de POO, e ele gera os 3 arquivos da questão prontos: README.md, tests.toml e Shell.java, no mesmo formato das questões do repositório (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
+Você passa um contexto (cassino, aeroporto, biblioteca), um nível(fácil, médio ou difícil) e um tema de POO(herança, polimorfismo, encapsulamento ...), e ele gera os 3 arquivos da questão prontos: README.md, tests.toml e Shell.java, no mesmo formato das questões do repositório (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
 
 ---
 
@@ -81,7 +81,8 @@ llm_rascunho = LLM(
 )
 ```
 
-Rodando local não tem limite de requisição. Recomendado para quem tem GPU com 8GB+ de VRAM.
+Rodando local não tem limite de requisição. O ollama8b é Recomendado se sua GPU tem 8GB+ de VRAM.
+(Fique livre pra tentar com outros modelos :) )
 
 ---
 
