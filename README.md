@@ -1,0 +1,93 @@
+# Forja
+
+Gerador de questões de POO para o repositório arcade.
+
+Você passa um contexto (cassino, aeroporto, maratona), um nível e um tema de POO, e ele gera os 3 arquivos da questão prontos: README.md, tests.toml e Shell.java, no mesmo formato das questões do repositório (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
+
+---
+
+## Como funciona
+
+Três agentes rodam em sequência via CrewAI:
+
+1. O Designer Instrucional cria o rascunho da questão com história, enunciado e casos de teste
+2. O Especialista POO gera o README.md e o tests.toml no formato correto
+3. O mesmo Especialista gera o Shell.java com o esqueleto para o aluno completar
+
+Os agentes usam LLaMA 3.3 70B via Groq. Dá pra trocar pra Ollama e rodar local se quiser.
+---
+
+## Instalação
+
+Clone o repositório e entre na pasta:
+
+```bash
+git clone https://github.com/seu-usuario/forja.git
+cd forja
+```
+Instale as dependências:
+
+```bash
+pip install crewai litellm python-dotenv
+```
+
+Crie o .env:
+
+```bash
+cp .env.example .env
+```
+
+Preencha com seus valores:
+GROQ_API_KEY=sua_chave_aqui
+CAMINHO_REPO=/home/seu-usuario/arcade/base
+OUTPUT_DIR=/home/seu-usuario/QuestionCreate/output
+
+Chave gratuita em console.groq.com.
+
+---
+
+## Uso
+
+```bash
+python Main.py
+```
+
+O sistema pede 3 coisas:
+Contexto da questão (ex: concessionaria, aeroporto, biblioteca): maratona
+Nível (Fácil / Médio / Difícil): Difícil
+Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento): Herança
+
+Os arquivos são salvos em output/maratona/.
+
+---
+
+## Rodando local com Ollama
+
+Se não quiser depender do Groq, instale o Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.1:8b
+```
+
+Troque os LLMs no código:
+
+```python
+llm_rascunho = LLM(
+    model="ollama/llama3.1:8b",
+    base_url="http://localhost:11434",
+    temperature=0.5,
+    max_tokens=1500
+)
+```
+
+Rodando local não tem limite de requisição. Recomendado para quem tem GPU com 8GB+ de VRAM.
+
+---
+
+## Dependências
+
+- Python 3.10+
+- crewai 0.80+
+- litellm 1.0+
+- python-dotenv 1.0+
