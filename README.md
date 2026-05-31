@@ -38,8 +38,8 @@ cp .env.example .env
 ```
 
 Preencha com seus valores:
-GROQ_API_KEY=sua_chave_aqui
-CAMINHO_REPO=/home/seu-usuario/arcade/base
+GROQ_API_KEY=sua_chave_aqui | 
+CAMINHO_REPO=/home/seu-usuario/arcade/base | 
 OUTPUT_DIR=/home/seu-usuario/QuestionCreate/output
 
 Chave gratuita em console.groq.com.
