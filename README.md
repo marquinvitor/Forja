@@ -38,11 +38,11 @@ cp .env.example .env
 ```
 
 Preencha com seus valores:
-GROQ_API_KEY=sua_chave_aqui | 
-CAMINHO_REPO=/home/seu-usuario/arcade/base | 
+GROQ_API_KEY=sua_chave_aqui \
+CAMINHO_REPO=/home/seu-usuario/arcade/base \
 OUTPUT_DIR=/home/seu-usuario/QuestionCreate/output
 
-Chave gratuita em console.groq.com.
+a key do groq é gratuita em console.groq.com/keys
 
 ---
 
@@ -53,9 +53,9 @@ python Main.py
 ```
 
 O sistema pede 3 coisas:
-Contexto da questão (ex: concessionaria, aeroporto, biblioteca): maratona
-Nível (Fácil / Médio / Difícil): Difícil
-Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento): Herança
+Contexto da questão (ex: concessionaria, aeroporto, biblioteca) -  EX: maratona
+Nível (Fácil / Médio / Difícil) -  EX: Difícil
+Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento) - EX: Herança
 
 Os arquivos são salvos em output/maratona/.
 
