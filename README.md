@@ -37,12 +37,12 @@ Crie o .env:
 cp .env.example .env
 ```
 
-Preencha com seus valores:
+Preencha com seus valores: \
 GROQ_API_KEY=sua_chave_aqui \
 CAMINHO_REPO=/home/seu-usuario/arcade/base \
 OUTPUT_DIR=/home/seu-usuario/QuestionCreate/output
 
-a key do groq é gratuita em console.groq.com/keys
+A key do groq é gratuita em console.groq.com/keys
 
 ---
 
