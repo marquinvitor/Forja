@@ -1,0 +1,64 @@
+[[tests]]
+input = '''
+addCarro ABC123 2
+show
+end
+'''
+output = '''
+$addCarro ABC123 2
+$show
+Carro ABC123 2 10.0
+$end
+'''
+
+[[tests]]
+input = '''
+addMoto DEF456 3
+show
+end
+'''
+output = '''
+$addMoto DEF456 3
+$show
+Moto DEF456 3 9.0
+$end
+'''
+
+[[tests]]
+input = '''
+addCaminhao GHI789 1
+show
+end
+'''
+output = '''
+$addCaminhao GHI789 1
+$show
+Caminhao GHI789 1 10.0
+$end
+'''
+
+[[tests]]
+input = '''
+addCarro JKL012 120
+show
+end
+'''
+output = '''
+$addCarro JKL012 120
+$show
+Carro JKL012 2 10.0
+$end
+'''
+
+[[tests]]
+input = '''
+addMoto MNO345 90
+show
+end
+'''
+output = '''
+$addMoto MNO345 90
+$show
+Moto MNO345 1.5 4.5
+$end
+'''

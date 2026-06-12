@@ -1,0 +1,89 @@
+[[tests]]
+input = '''
+addItem arroz 5.0 10 2024-03-15
+show
+end
+'''
+output = '''
+$addItem arroz 5.0 10 2024-03-15
+$show
+arroz 5.0 10 2024-03-15
+$end
+'''
+
+[[tests]]
+input = '''
+addItem detergente 3.0 20 limpeza de superfícies
+show
+end
+'''
+output = '''
+$addItem detergente 3.0 20 limpeza de superfícies
+$show
+detergente 3.0 20 limpeza de superfícies
+$end
+'''
+
+[[tests]]
+input = '''
+addItem tv 1000.0 5 Samsung 4K
+show
+end
+'''
+output = '''
+$addItem tv 1000.0 5 Samsung 4K
+$show
+tv 1000.0 5 Samsung 4K
+$end
+'''
+
+[[tests]]
+input = '''
+addItem arroz 5.0 10 2024-03-15
+addItem detergente 3.0 20 limpeza de superfícies
+show
+end
+'''
+output = '''
+$addItem arroz 5.0 10 2024-03-15
+$addItem detergente 3.0 20 limpeza de superfícies
+$show
+arroz 5.0 10 2024-03-15
+detergente 3.0 20 limpeza de superfícies
+$end
+'''
+
+[[tests]]
+input = '''
+addItem tv 1000.0 5 Samsung 4K
+addItem arroz 5.0 10 2024-03-15
+show
+end
+'''
+output = '''
+$addItem tv 1000.0 5 Samsung 4K
+$addItem arroz 5.0 10 2024-03-15
+$show
+tv 1000.0 5 Samsung 4K
+arroz 5.0 10 2024-03-15
+$end
+'''
+
+[[tests]]
+input = '''
+addItem arroz 5.0 10 2024-03-15
+addItem detergente 3.0 20 limpeza de superfícies
+addItem tv 1000.0 5 Samsung 4K
+show
+end
+'''
+output = '''
+$addItem arroz 5.0 10 2024-03-15
+$addItem detergente 3.0 20 limpeza de superfícies
+$addItem tv 1000.0 5 Samsung 4K
+$show
+arroz 5.0 10 2024-03-15
+detergente 3.0 20 limpeza de superfícies
+tv 1000.0 5 Samsung 4K
+$end
+'''

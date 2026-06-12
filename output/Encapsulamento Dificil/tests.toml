@@ -1,0 +1,73 @@
+[[tests]]
+input = '''
+addPaciente Joao 25 M 180 70
+show
+end
+'''
+output = '''
+$addPaciente Joao 25 M 180 70
+$show
+Nome: Joao, Idade: 25, Sexo: M, Altura: 180.0, Peso: 70.0, Historico Medico: []
+$end
+'''
+
+[[tests]]
+input = '''
+addPaciente Joao 25 M 180 70
+addHistoricoMedico Dor de cabeca
+show
+end
+'''
+output = '''
+$addPaciente Joao 25 M 180 70
+$addHistoricoMedico Dor de cabeca
+$show
+Nome: Joao, Idade: 25, Sexo: M, Altura: 180.0, Peso: 70.0, Historico Medico: [Dor de cabeca]
+$end
+'''
+
+[[tests]]
+input = '''
+addPaciente Joao 25 M 180 70
+calcularIMC
+end
+'''
+output = '''
+$addPaciente Joao 25 M 180 70
+$calcularIMC
+IMC: 21.6
+$end
+'''
+
+[[tests]]
+input = '''
+addPaciente Joao 25 M 180 70
+addHistoricoMedico Dor de cabeca
+addHistoricoMedico Febre
+show
+end
+'''
+output = '''
+$addPaciente Joao 25 M 180 70
+$addHistoricoMedico Dor de cabeca
+$addHistoricoMedico Febre
+$show
+Nome: Joao, Idade: 25, Sexo: M, Altura: 180.0, Peso: 70.0, Historico Medico: [Dor de cabeca, Febre]
+$end
+'''
+
+[[tests]]
+input = '''
+addPaciente Joao 25 M 180 70
+addPaciente Maria 30 F 160 60
+show
+end
+'''
+output = '''
+$addPaciente Joao 25 M 180 70
+$addPaciente Maria 30 F 160 60
+$show
+Nome: Joao, Idade: 25, Sexo: M, Altura: 180.0, Peso: 70.0, Historico Medico: []
+Nome: Maria, Idade: 30, Sexo: F, Altura: 160.0, Peso: 60.0, Historico Medico: []
+$end
+'''

@@ -1,0 +1,72 @@
+[[tests]]
+input = '''
+addServico banho simples 20.0
+realizarServicos
+end
+'''
+output = '''
+$addServico banho simples 20.0
+$realizarServicos
+Realizando banho simples para o pet.
+$end
+'''
+
+[[tests]]
+input = '''
+addServico tosa padrao 30.0
+realizarServicos
+end
+'''
+output = '''
+$addServico tosa padrao 30.0
+$realizarServicos
+Realizando tosa padrão para o pet.
+$end
+'''
+
+[[tests]]
+input = '''
+addServico consulta cardiologia 50.0
+realizarServicos
+end
+'''
+output = '''
+$addServico consulta cardiologia 50.0
+$realizarServicos
+Realizando consulta de cardiologia para o pet.
+$end
+'''
+
+[[tests]]
+input = '''
+addServico banho simples 20.0
+addServico tosa padrao 30.0
+addServico consulta cardiologia 50.0
+realizarServicos
+end
+'''
+output = '''
+$addServico banho simples 20.0
+$addServico tosa padrao 30.0
+$addServico consulta cardiologia 50.0
+$realizarServicos
+Realizando banho simples para o pet.
+Realizando tosa padrão para o pet.
+Realizando consulta de cardiologia para o pet.
+$end
+'''
+
+[[tests]]
+input = '''
+addServico banho simples 20.0
+setPreco 25.0
+realizarServicos
+end
+'''
+output = '''
+$addServico banho simples 20.0
+$setPreco 25.0
+$realizarServicos
+Realizando banho simples para o pet.
+$end
+'''

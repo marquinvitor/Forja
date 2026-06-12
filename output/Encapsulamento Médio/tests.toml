@@ -1,0 +1,73 @@
+[[tests]]
+input = '''
+addAluno Joao 12345 8 9
+show
+end
+'''
+output = '''
+$addAluno Joao 12345 8 9
+$show
+Joao 12345 8 9
+$end
+'''
+
+[[tests]]
+input = '''
+addAluno Maria 67890 5 6
+show
+end
+'''
+output = '''
+$addAluno Maria 67890 5 6
+$show
+Maria 67890 5 6
+$end
+'''
+
+[[tests]]
+input = '''
+addAluno Pedro 11111 10 10
+show
+media Pedro
+end
+'''
+output = '''
+$addAluno Pedro 11111 10 10
+$show
+Pedro 11111 10 10
+$media Pedro
+10.0
+$end
+'''
+
+[[tests]]
+input = '''
+addAluno Ana 22222 0 0
+show
+media Ana
+end
+'''
+output = '''
+$addAluno Ana 22222 0 0
+$show
+Ana 22222 0 0
+$media Ana
+0.0
+$end
+'''
+
+[[tests]]
+input = '''
+addAluno Carlos 33333 7 7
+show
+media Carlos
+end
+'''
+output = '''
+$addAluno Carlos 33333 7 7
+$show
+Carlos 33333 7 7
+$media Carlos
+7.0
+$end
+'''

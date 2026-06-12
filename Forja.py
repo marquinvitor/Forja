@@ -5,9 +5,9 @@ from crewai import Agent, Task, Crew, Process, LLM
 import litellm
 from dotenv import load_dotenv
 
-load_dotenv()  # carrega o .env automaticamente
+load_dotenv()
 
-CHAVE_GROQ  = os.getenv("GROQ_API_KEY")
+CHAVE_GROQ   = os.getenv("GROQ_API_KEY")
 CAMINHO_REPO = os.getenv("CAMINHO_REPO", os.path.expanduser("~/arcade/base"))
 OUTPUT_DIR   = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/output"))
 
@@ -32,7 +32,6 @@ def _safe_completion(**kwargs):
 litellm.completion = _safe_completion
 os.environ["CREWAI_DISABLE_PROMPT_CACHING"] = "true"
 
-# leitura do repositorio de questoes local do sena
 
 def carregar_exemplos(caminho_base: str, max_exemplos: int = 2) -> str:
     base = Path(caminho_base)
@@ -85,7 +84,8 @@ def extrair_bloco(texto: str, marcador: str) -> str:
         return ""
     return texto[inicio + len(f"<<<{marcador}>>>"):fim].strip()
 
-# config 
+
+# config
 
 llm_rascunho = LLM(
     model="openai/llama-3.3-70b-versatile",
@@ -97,13 +97,14 @@ llm_rascunho = LLM(
 )
 
 llm_revisao = LLM(
-    model="openai/llama-3.3-70b-versatile",  
+    model="openai/llama-3.3-70b-versatile",
     api_key=CHAVE_GROQ,
     base_url="https://api.groq.com/openai/v1",
     temperature=0.3,
     max_retries=3,
     max_tokens=2000
 )
+
 
 # Input do usuario
 
@@ -115,18 +116,63 @@ nome_questao     = contexto_usuario.lower().replace(" ", "_")
 
 entrada_usuario = f"Crie uma questão nível {nivel} sobre {tema_poo} em Java, contextualizada num sistema de {contexto_usuario}."
 
-# sessao de contexto 
+
+# contexto
 
 print("\nCarregando exemplos do repositório...")
 exemplos = carregar_exemplos(CAMINHO_REPO, max_exemplos=2)
 
-SHELL_EXEMPLO = """
+# Exemplo de esqueleto para o shell.java, que mantém a responsabilidade para os alunos de implementar a lógica de classes e métodos.
+
+SHELL_ESQUELETO_EXEMPLO = """
+import java.util.ArrayList;
 import java.util.Scanner;
+
+// ── EXEMPLO DE CONTEXTO: piscina / atletas ────────────────────────────────
+// As classes abaixo mostram o PADRÃO esperado de esqueleto.
+// O modelo deve criar classes equivalentes para o contexto da questão gerada.
+
+class Atleta {
+    String nome;
+    int idade;
+    int experiencia;
+
+    public Atleta(String nome, int idade, int experiencia) {
+        // TODO: inicialize os atributos
+    }
+
+    public String getInfo() {
+        // TODO: retorne as informações do atleta formatadas
+        return "";
+    }
+}
+
+class Nadador extends Atleta {
+    String estilo;
+    double tempoMedio;
+
+    public Nadador(String nome, int idade, int experiencia, String estilo, double tempoMedio) {
+        super(nome, idade, experiencia);
+        // TODO: inicialize os atributos específicos de Nadador
+    }
+
+    public String getDesempenho() {
+        // TODO: retorne "ouro", "prata" ou "bronze" com base no tempoMedio
+        return "";
+    }
+
+    @Override
+    public String getInfo() {
+        // TODO: retorne as informações completas do nadador
+        return "";
+    }
+}
 
 public class Shell {
     static Scanner scanner = new Scanner(System.in);
+    static ArrayList<Atleta> atletas = new ArrayList<>();
+
     public static void main(String[] _args) {
-        // MinhaClasse obj = new MinhaClasse(...);
         while (true) {
             var line = scanner.nextLine();
             System.out.println("$" + line);
@@ -134,11 +180,22 @@ public class Shell {
             var cmd = par[0];
             if (cmd.equals("end")) {
                 break;
-            } else if (cmd.equals("cmd1")) {
-                // var param1 = par[1];
-            } else if (cmd.equals("cmd2")) {
-                // var param1 = par[1];
-                // var param2 = par[2];
+            } else if (cmd.equals("addAtleta")) {
+                var nome = par[1];
+                var idade = Integer.parseInt(par[2]);
+                var experiencia = Integer.parseInt(par[3]);
+                atletas.add(new Atleta(nome, idade, experiencia));
+            } else if (cmd.equals("addNadador")) {
+                var nome = par[1];
+                var idade = Integer.parseInt(par[2]);
+                var experiencia = Integer.parseInt(par[3]);
+                var estilo = par[4];
+                var tempoMedio = Double.parseDouble(par[5]);
+                atletas.add(new Nadador(nome, idade, experiencia, estilo, tempoMedio));
+            } else if (cmd.equals("show")) {
+                for (Atleta a : atletas) {
+                    System.out.println(a.getInfo());
+                }
             } else {
                 System.out.println("fail: comando invalido\\n");
             }
@@ -147,7 +204,7 @@ public class Shell {
 }
 """
 
-# ─── AGENTES ──────────────────────────────────────────────────────────────────
+# ─── AGENTES ─────────────────────────────────────────────────────────────────
 
 designer_criativo = Agent(
     role='Designer Instrucional de TI',
@@ -169,7 +226,7 @@ especialista_poo = Agent(
     llm=llm_revisao
 )
 
-# tarefas
+# ─── TAREFAS ─────────────────────────────────────────────────────────────────
 
 tarefa_rascunho = Task(
     description=f"""Crie uma questão de programação para: "{entrada_usuario}".
@@ -251,17 +308,35 @@ Use EXATAMENTE estes marcadores:
 )
 
 tarefa_shell = Task(
-    description=f"""Com base nos testes gerados, crie o Shell.java completo.
+    description=f"""Com base na questão e nos testes gerados, crie o Shell.java.
 
-Siga EXATAMENTE este padrão:
-{SHELL_EXEMPLO}
+OBJETIVO: gerar um ESQUELETO para o aluno completar.
 
-Regras obrigatórias:
-- Um else-if para cada comando presente nos testes
-- Comentários em MAIÚSCULO indicando o que o aluno deve implementar
-- Variáveis com nomes relacionados ao contexto "{contexto_usuario}"
-- Instância da classe principal comentada no topo da main
-- Extraia parâmetros do array par[] quando necessário, também comentado
+REGRA PRINCIPAL — dois tipos de conteúdo no arquivo:
+
+1. CLASSES (totalmente vazias para o aluno implementar):
+   - Declare os atributos com o tipo correto, mas SEM inicializar valores.
+   - O construtor deve ter os parâmetros corretos, mas o corpo contém apenas:
+       // TODO: inicialize os atributos
+   - Cada método deve ter a assinatura correta e o tipo de retorno correto, mas o corpo contém apenas:
+       // TODO: implemente este método
+       return ""; // (ou return 0; ou return null; conforme o tipo)
+   - Herança (extends) e anotações (@Override) devem aparecer normalmente.
+   - NÃO escreva nenhuma lógica real nas classes.
+
+2. MÉTODO main (completamente implementado):
+   - Loop while(true) com scanner.nextLine() e System.out.println("$" + line)
+   - split(" ") e var cmd = par[0]
+   - Um else-if por comando presente nos testes, com:
+       • Extração de parâmetros do array par[] com os tipos corretos (parseInt, parseDouble etc.)
+       • Instanciação correta da classe com new
+       • Chamada ao método correto (add em lista, println no resultado etc.)
+   - Bloco else com: System.out.println("fail: comando invalido\\n");
+   - Listas (ArrayList) declaradas como atributos estáticos da classe Shell, fora da main.
+   - NÃO deixe TODOs nem comentários na main — ela deve funcionar se o aluno implementar as classes.
+
+Siga o padrão deste exemplo (adapte classes e comandos ao contexto "{contexto_usuario}"):
+{SHELL_ESQUELETO_EXEMPLO}
 
 Use EXATAMENTE este marcador:
 
@@ -272,7 +347,7 @@ Use EXATAMENTE este marcador:
     agent=especialista_poo
 )
 
-# execucao
+# ─── EXECUÇÃO ────────────────────────────────────────────────────────────────
 
 equipe = Crew(
     agents=[designer_criativo, especialista_poo],
@@ -283,7 +358,7 @@ equipe = Crew(
 print("Gerando questão...\n")
 resultado = equipe.kickoff()
 
-# extracao e salvamento
+# extração e salvamento
 
 saidas = [str(t.output) for t in equipe.tasks if t.output]
 tudo = "\n".join(saidas)

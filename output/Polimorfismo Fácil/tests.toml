@@ -1,0 +1,80 @@
+[[tests]]
+input = '''
+addItem Martelo de Bola 50.0 2.0
+show
+end
+'''
+output = '''
+$addItem Martelo de Bola 50.0 2.0
+$show
+Martelo de Bola 50.0 2.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Serrote de Madeira 30.0 20.0
+show
+end
+'''
+output = '''
+$addItem Serrote de Madeira 30.0 20.0
+$show
+Serrote de Madeira 30.0 20.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Chave de Fenda Ajustável 20.0 10
+show
+end
+'''
+output = '''
+$addItem Chave de Fenda Ajustável 20.0 10
+$show
+Chave de Fenda Ajustável 20.0 10
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Martelo de Bola 0.0 2.0
+show
+end
+'''
+output = '''
+$addItem Martelo de Bola 0.0 2.0
+$show
+Martelo de Bola 0.0 2.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Serrote de Madeira 30.0 0.0
+show
+end
+'''
+output = '''
+$addItem Serrote de Madeira 30.0 0.0
+$show
+Serrote de Madeira 30.0 0.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Martelo de Bola 50.0 2.0
+addItem Serrote de Madeira 30.0 20.0
+show
+end
+'''
+output = '''
+$addItem Martelo de Bola 50.0 2.0
+$addItem Serrote de Madeira 30.0 20.0
+$show
+Martelo de Bola 50.0 2.0
+Serrote de Madeira 30.0 20.0
+$end
+'''

@@ -1,0 +1,70 @@
+[[tests]]
+input = '''
+addConta 123 1000.0 João
+show
+end
+'''
+output = '''
+$addConta 123 1000.0 João
+$show
+123 1000.0 João
+$end
+'''
+
+[[tests]]
+input = '''
+addConta 123 1000.0 João
+depositar 123 500.0
+show
+end
+'''
+output = '''
+$addConta 123 1000.0 João
+$depositar 123 500.0
+$show
+123 1500.0 João
+$end
+'''
+
+[[tests]]
+input = '''
+addConta 123 1000.0 João
+sacar 123 200.0
+show
+end
+'''
+output = '''
+$addConta 123 1000.0 João
+$sacar 123 200.0
+$show
+123 800.0 João
+$end
+'''
+
+[[tests]]
+input = '''
+addConta 123 1000.0 João
+sacar 123 1500.0
+show
+end
+'''
+output = '''
+$addConta 123 1000.0 João
+$sacar 123 1500.0
+$show
+123 1000.0 João
+$end
+'''
+
+[[tests]]
+input = '''
+addConta 123 1000.0 João
+getNomeTitular 123
+end
+'''
+output = '''
+$addConta 123 1000.0 João
+$getNomeTitular 123
+João
+$end
+'''

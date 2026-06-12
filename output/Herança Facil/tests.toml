@@ -1,0 +1,73 @@
+[[tests]]
+input = '''
+addVeiculo Toyota Corolla 2015
+show
+end
+'''
+output = '''
+$addVeiculo Toyota Corolla 2015
+$show
+Toyota Corolla 2015
+$end
+'''
+
+[[tests]]
+input = '''
+addAviao Boeing 737 2010 200 12000
+show
+end
+'''
+output = '''
+$addAviao Boeing 737 2010 200 12000
+$show
+Boeing 737 2010 200 12000
+$end
+'''
+
+[[tests]]
+input = '''
+addVeiculo Ford Fusion 2018
+addAviao Airbus A320 2012 250 10000
+show
+end
+'''
+output = '''
+$addVeiculo Ford Fusion 2018
+$addAviao Airbus A320 2012 250 10000
+$show
+Ford Fusion 2018
+Airbus A320 2012 250 10000
+$end
+'''
+
+[[tests]]
+input = '''
+addVeiculo Honda Civic 2020
+addAviao Boeing 747 2015 300 15000
+show
+end
+'''
+output = '''
+$addVeiculo Honda Civic 2020
+$addAviao Boeing 747 2015 300 15000
+$show
+Honda Civic 2020
+Boeing 747 2015 300 15000
+$end
+'''
+
+[[tests]]
+input = '''
+addAviao Airbus A380 2010 500 12000
+addVeiculo Toyota Camry 2012
+show
+end
+'''
+output = '''
+$addAviao Airbus A380 2010 500 12000
+$addVeiculo Toyota Camry 2012
+$show
+Airbus A380 2010 500 12000
+Toyota Camry 2012
+$end
+'''

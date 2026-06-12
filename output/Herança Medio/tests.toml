@@ -1,0 +1,64 @@
+[[tests]]
+input = '''
+addItem Livro Harry Potter J.K. Rowling 2000 10
+show
+end
+'''
+output = '''
+$addItem Livro Harry Potter J.K. Rowling 2000 10
+$show
+Título: Harry Potter, Autor: J.K. Rowling, Ano de Publicação: 2000, Quantidade em Estoque: 10, Valor Total: 100.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Revista Veja Abril 2020 5
+show
+end
+'''
+output = '''
+$addItem Revista Veja Abril 2020 5
+$show
+Título: Veja, Autor: Abril, Ano de Publicação: 2020, Quantidade em Estoque: 5, Valor Total: 25.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem CD Thriller Michael Jackson 1982 8
+show
+end
+'''
+output = '''
+$addItem CD Thriller Michael Jackson 1982 8
+$show
+Título: Thriller, Autor: Michael Jackson, Ano de Publicação: 1982, Quantidade em Estoque: 8, Valor Total: 64.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Livro O Senhor dos Anéis J.R.R. Tolkien 1954 15
+show
+end
+'''
+output = '''
+$addItem Livro O Senhor dos Anéis J.R.R. Tolkien 1954 15
+$show
+Título: O Senhor dos Anéis, Autor: J.R.R. Tolkien, Ano de Publicação: 1954, Quantidade em Estoque: 15, Valor Total: 150.0
+$end
+'''
+
+[[tests]]
+input = '''
+addItem Revista National Geographic National Geographic Society 2022 12
+show
+end
+'''
+output = '''
+$addItem Revista National Geographic National Geographic Society 2022 12
+$show
+Título: National Geographic, Autor: National Geographic Society, Ano de Publicação: 2022, Quantidade em Estoque: 12, Valor Total: 60.0
+$end
+'''
