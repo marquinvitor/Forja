@@ -15,6 +15,7 @@ Três agentes rodam em sequência via CrewAI:
 3. O mesmo Especialista gera o Shell.java com o esqueleto para o aluno completar
 
 Os agentes usam LLaMA 3.3 70B via Groq. Dá pra trocar pra Ollama e rodar local se quiser.
+
 ---
 
 ## Instalação
@@ -25,6 +26,7 @@ Clone o repositório e entre na pasta:
 git clone https://github.com/seu-usuario/forja.git
 cd forja
 ```
+
 Instale as dependências:
 
 ```bash
@@ -53,11 +55,60 @@ python Main.py
 ```
 
 O sistema pede 3 coisas:
-Contexto da questão (ex: concessionaria, aeroporto, biblioteca) -  EX: maratona
-Nível (Fácil / Médio / Difícil) -  EX: Difícil
+
+Contexto da questão (ex: concessionaria, aeroporto, biblioteca) - EX: maratona  
+Nível (Fácil / Médio / Difícil) - EX: Difícil  
 Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento) - EX: Herança
 
 Os arquivos são salvos em output/maratona/.
+
+---
+
+## Validador de questões
+
+O projeto também possui um validador automático para conferir os artefatos gerados em `output/`.
+
+Ele percorre as pastas das questões, lê os arquivos `tests.toml`, compila os `Shell.java` e executa os casos de teste para verificar se o esqueleto processa as entradas sem crash.
+
+Para rodar a validação:
+
+```bash
+python validar_questoes.py output
+```
+
+Para gerar um relatório em JSON:
+
+```bash
+python validar_questoes.py output --relatorio relatorio_validacao.json
+```
+
+O relatório mostra quantas questões foram analisadas, quantos arquivos `tests.toml` estão válidos, quantos `Shell.java` compilaram e quantas execuções terminaram sem erro.
+
+Exemplo de saída:
+
+```bash
+RQ2: tests.toml lidos sem erro de parsing: 9/9
+RQ2: tests.toml com estrutura válida:       9/9
+RQ3: Shell.java compilados com sucesso:    9/9
+RQ3: Questões executadas sem crash:        4/9
+Execuções sem crash:                       25/47
+```
+
+O validador não confere se a saída lógica da questão está correta. Ele serve para verificar a conformidade técnica dos arquivos gerados: estrutura do `tests.toml`, compilação do `Shell.java` e execução sem exceções.
+
+Para usar o validador é necessário ter o Java instalado, com os comandos `javac` e `java` disponíveis no terminal.
+
+No Arch Linux:
+
+```bash
+sudo pacman -S jdk-openjdk
+```
+
+No Ubuntu/Debian:
+
+```bash
+sudo apt install default-jdk
+```
 
 ---
 
@@ -89,6 +140,7 @@ Rodando local não tem limite de requisição. O ollama8b é Recomendado se sua 
 ## Dependências
 
 - Python 3.10+
+- Java JDK 17+
 - crewai 0.80+
 - litellm 1.0+
 - python-dotenv 1.0+

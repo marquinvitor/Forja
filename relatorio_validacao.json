@@ -1,0 +1,571 @@
+{
+  "resumo": {
+    "questoes_analisadas": 9,
+    "toml_parseados": 9,
+    "toml_estrutura_valida": 9,
+    "shells_compilados": 9,
+    "questoes_com_execucoes_sem_crash": 4,
+    "questoes_com_cobertura_de_comandos_ok": 9,
+    "questoes_aprovadas_no_status_geral": 4,
+    "total_casos_toml": 47,
+    "total_execucoes": 47,
+    "execucoes_ok": 25
+  },
+  "questoes": [
+    {
+      "questao": "Encapsulamento Dificil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Encapsulamento Dificil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addHistoricoMedico",
+        "addPaciente",
+        "calcularIMC",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.ArrayIndexOutOfBoundsException: Index 1 out of bounds for length 1\n\tat Shell.main(Shell.java:89)"
+        },
+        {
+          "caso": "caso_4",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.ArrayIndexOutOfBoundsException: Index 2 out of bounds for length 2\n\tat Shell.main(Shell.java:82)"
+        },
+        {
+          "caso": "caso_5",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "execucoes_sem_crash": false,
+      "status_geral": "FALHOU"
+    },
+    {
+      "questao": "Encapsulamento Facil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Encapsulamento Facil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addConta",
+        "depositar",
+        "end",
+        "getNomeTitular",
+        "sacar",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_4",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_5",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "execucoes_sem_crash": true,
+      "status_geral": "PASSOU"
+    },
+    {
+      "questao": "Encapsulamento Médio",
+      "caminho": "/home/hex/Documents/github/Forja/output/Encapsulamento Médio",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addAluno",
+        "end",
+        "media",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_4",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_5",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "execucoes_sem_crash": true,
+      "status_geral": "PASSOU"
+    },
+    {
+      "questao": "Herança Dificil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Herança Dificil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 6,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addItem",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"limpeza\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:123)"
+        },
+        {
+          "caso": "caso_3",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"Samsung\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:115)"
+        },
+        {
+          "caso": "caso_4",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"limpeza\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:123)"
+        },
+        {
+          "caso": "caso_5",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"Samsung\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:115)"
+        },
+        {
+          "caso": "caso_6",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"limpeza\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:123)"
+        }
+      ],
+      "execucoes_sem_crash": false,
+      "status_geral": "FALHOU"
+    },
+    {
+      "questao": "Herança Facil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Herança Facil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addAviao",
+        "addVeiculo",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_4",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_5",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "execucoes_sem_crash": true,
+      "status_geral": "PASSOU"
+    },
+    {
+      "questao": "Herança Medio",
+      "caminho": "/home/hex/Documents/github/Forja/output/Herança Medio",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addItem",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"J.K.\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:105)"
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"Jackson\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:105)"
+        },
+        {
+          "caso": "caso_4",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"dos\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:105)"
+        },
+        {
+          "caso": "caso_5",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"National\"\n\tat java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:527)\n\tat java.base/java.lang.Integer.parseInt(Integer.java:624)\n\tat Shell.main(Shell.java:105)"
+        }
+      ],
+      "execucoes_sem_crash": false,
+      "status_geral": "FALHOU"
+    },
+    {
+      "questao": "Polimorfismo Fácil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Polimorfismo Fácil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 6,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addItem",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        },
+        {
+          "caso": "caso_2",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        },
+        {
+          "caso": "caso_3",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        },
+        {
+          "caso": "caso_4",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        },
+        {
+          "caso": "caso_5",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        },
+        {
+          "caso": "caso_6",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"de\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:101)"
+        }
+      ],
+      "execucoes_sem_crash": false,
+      "status_geral": "FALHOU"
+    },
+    {
+      "questao": "Polimorfismo Medio",
+      "caminho": "/home/hex/Documents/github/Forja/output/Polimorfismo Medio",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addCaminhao",
+        "addCarro",
+        "addMoto",
+        "end",
+        "show"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_2",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_3",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_4",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "caso": "caso_5",
+          "ok": true,
+          "timeout": false,
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "execucoes_sem_crash": true,
+      "status_geral": "PASSOU"
+    },
+    {
+      "questao": "Polimorfsimo Dificil",
+      "caminho": "/home/hex/Documents/github/Forja/output/Polimorfsimo Dificil",
+      "possui_shell_java": true,
+      "possui_tests_toml": true,
+      "toml_parseado": true,
+      "toml_estrutura_valida": true,
+      "total_casos": 5,
+      "erros_toml": [],
+      "avisos_toml": [],
+      "compilou": true,
+      "erro_compilacao": "",
+      "comandos_detectados": [
+        "addServico",
+        "end",
+        "realizarServicos",
+        "setPreco"
+      ],
+      "comandos_nao_encontrados_no_shell": [],
+      "cobertura_comandos_ok": true,
+      "execucoes": [
+        {
+          "caso": "caso_1",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"simples\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:118)"
+        },
+        {
+          "caso": "caso_2",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"padrao\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:118)"
+        },
+        {
+          "caso": "caso_3",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"cardiologia\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:118)"
+        },
+        {
+          "caso": "caso_4",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"simples\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:118)"
+        },
+        {
+          "caso": "caso_5",
+          "ok": false,
+          "timeout": false,
+          "returncode": 1,
+          "stderr": "Exception in thread \"main\" java.lang.NumberFormatException: For input string: \"simples\"\n\tat java.base/jdk.internal.math.FloatingDecimal.check(FloatingDecimal.java:1751)\n\tat java.base/jdk.internal.math.FloatingDecimal.readJavaFormatString(FloatingDecimal.java:1374)\n\tat java.base/jdk.internal.math.FloatingDecimal.parseDouble(FloatingDecimal.java:61)\n\tat java.base/java.lang.Double.parseDouble(Double.java:993)\n\tat Shell.main(Shell.java:118)"
+        }
+      ],
+      "execucoes_sem_crash": false,
+      "status_geral": "FALHOU"
+    }
+  ]
+}
