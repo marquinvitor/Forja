@@ -1,9 +1,21 @@
 import os
 import random
+import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from crewai import Agent, Task, Crew, Process, LLM
 import litellm
 from dotenv import load_dotenv
+
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib  
+    except ImportError:
+        tomllib = None
 
 load_dotenv()
 
@@ -13,6 +25,11 @@ OUTPUT_DIR   = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/outp
 
 if not CHAVE_GROQ:
     raise ValueError("GROQ_API_KEY não encontrada no .env")
+
+if tomllib is None:
+    raise ImportError(
+        "nenhum parser TOML disponivel"
+    )
 
 # gambiarra pra nao usar cache
 litellm.cache = None
@@ -44,6 +61,7 @@ def carregar_exemplos(caminho_base: str, max_exemplos: int = 2) -> str:
     ]
 
     selecionadas = random.sample(questoes, min(max_exemplos, len(questoes)))
+    print(f"Exemplos escolhidos: {', '.join(q.name for q in selecionadas)}")
 
     contexto = ""
     for questao in selecionadas:
@@ -77,18 +95,166 @@ def salvar_arquivos(output_dir: str, nome: str, readme: str, toml: str, shell: s
     print(f"\nArquivos salvos em: {pasta}")
 
 
+def _limpar_cercas_markdown(texto: str) -> str:
+    """tira aqueles marcadores ```java ... que ficavam saindo no shell"""
+    texto = texto.strip()
+    texto = re.sub(r"^```[a-zA-Z0-9_-]*[ \t]*\n?", "", texto)
+    texto = re.sub(r"\n?```[ \t]*$", "", texto)
+    return texto.strip()
+
+
 def extrair_bloco(texto: str, marcador: str) -> str:
     inicio = texto.find(f"<<<{marcador}>>>")
     fim = texto.find("<<<END>>>", inicio)
     if inicio == -1 or fim == -1:
         return ""
-    return texto[inicio + len(f"<<<{marcador}>>>"):fim].strip()
+    bruto = texto[inicio + len(f"<<<{marcador}>>>"):fim].strip()
+    return _limpar_cercas_markdown(bruto)
+
+
+# ─── parsing e execução do Java ─────────────────────
+
+def parse_testes_toml(toml_str: str) -> list[dict]:
+    dados = tomllib.loads(toml_str)
+    return dados.get("tests", [])
+
+
+def _normalizar(saida: str) -> str:
+    return "\n".join(linha.rstrip() for linha in saida.strip("\n").splitlines())
+
+
+def comparar_saida(esperado: str, obtido: str) -> bool:
+    return _normalizar(esperado) == _normalizar(obtido)
+
+
+def compilar_e_executar(shell_java: str, toml_str: str, timeout_execucao: int = 10) -> dict:
+    """compila o gabarito e executa cada caso de tests.toml contra ele,
+    Retorna um dicionário com o resultado."""
+
+    if shutil.which("javac") is None or shutil.which("java") is None:
+        return {
+            "sucesso": False,
+            "etapa": "ambiente",
+            "detalhe": "javac/java não encontrados no PATH. Instale um JDK para habilitar a auditoria automática.",
+            "resultados": [],
+        }
+
+    try:
+        testes = parse_testes_toml(toml_str)
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "etapa": "parse_toml",
+            "detalhe": f"Falha ao interpretar tests.toml: {e}",
+            "resultados": [],
+        }
+
+    if not testes:
+        return {
+            "sucesso": False,
+            "etapa": "parse_toml",
+            "detalhe": "Nenhum caso de teste encontrado em tests.toml (bloco [[tests]] ausente ou vazio).",
+            "resultados": [],
+        }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / "Shell.java").write_text(shell_java, encoding="utf-8")
+
+        try:
+            compilacao = subprocess.run(
+                ["javac", "Shell.java"],
+                cwd=tmp_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "sucesso": False,
+                "etapa": "compilacao",
+                "detalhe": "Timeout ao compilar (> 30s).",
+                "resultados": [],
+            }
+
+        if compilacao.returncode != 0:
+            return {
+                "sucesso": False,
+                "etapa": "compilacao",
+                "detalhe": compilacao.stderr.strip()[:2000],
+                "resultados": [],
+            }
+
+        resultados = []
+        todos_ok = True
+
+        for i, teste in enumerate(testes, start=1):
+            entrada = teste.get("input", "")
+            esperado = teste.get("output", "")
+
+            try:
+                execucao = subprocess.run(
+                    ["java", "Shell"],
+                    cwd=tmp_path,
+                    input=entrada,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_execucao,
+                )
+            except subprocess.TimeoutExpired:
+                todos_ok = False
+                resultados.append({
+                    "teste": i,
+                    "ok": False,
+                    "detalhe": f"Timeout (> {timeout_execucao}s) — possível loop infinito ou leitura de entrada além do esperado.",
+                })
+                continue
+
+            if execucao.returncode != 0 and execucao.stderr.strip():
+                todos_ok = False
+                resultados.append({
+                    "teste": i,
+                    "ok": False,
+                    "detalhe": f"Exceção em tempo de execução:\n{execucao.stderr.strip()[:800]}",
+                })
+                continue
+
+            obtido = execucao.stdout
+            if comparar_saida(esperado, obtido):
+                resultados.append({"teste": i, "ok": True})
+            else:
+                todos_ok = False
+                resultados.append({
+                    "teste": i,
+                    "ok": False,
+                    "detalhe": f"Saída divergente.\n--- Esperado ---\n{esperado.strip()}\n--- Obtido ---\n{obtido.strip()}",
+                })
+
+        return {
+            "sucesso": todos_ok,
+            "etapa": "execucao" if todos_ok else "testes",
+            "detalhe": "" if todos_ok else "Um ou mais casos de teste falharam.",
+            "resultados": resultados,
+        }
+
+
+def formatar_relatorio(resultado: dict) -> str:
+    if resultado["sucesso"]:
+        return "Todos os testes passaram. Compilação e execução consistentes."
+
+    linhas = [f"Etapa com falha: {resultado['etapa']}"]
+    if resultado.get("detalhe"):
+        linhas.append(resultado["detalhe"])
+    for r in resultado.get("resultados", []):
+        if not r["ok"]:
+            linhas.append(f"\n--- Teste {r['teste']} ---\n{r.get('detalhe', '')}")
+    return "\n".join(linhas)
 
 
 # config
 
 llm_rascunho = LLM(
-    model="openai/llama-3.3-70b-versatile",
+    model="openai/openai/gpt-oss-120b",
     api_key=CHAVE_GROQ,
     base_url="https://api.groq.com/openai/v1",
     temperature=0.5,
@@ -97,12 +263,21 @@ llm_rascunho = LLM(
 )
 
 llm_revisao = LLM(
-    model="openai/llama-3.3-70b-versatile",
+    model="openai/openai/gpt-oss-120b",
     api_key=CHAVE_GROQ,
     base_url="https://api.groq.com/openai/v1",
     temperature=0.3,
     max_retries=3,
     max_tokens=2000
+)
+
+llm_auditoria = LLM(
+    model="openai/openai/gpt-oss-120b",
+    api_key=CHAVE_GROQ,
+    base_url="https://api.groq.com/openai/v1",
+    temperature=0.2,
+    max_retries=3,
+    max_tokens=2500
 )
 
 
@@ -116,13 +291,12 @@ nome_questao     = contexto_usuario.lower().replace(" ", "_")
 
 entrada_usuario = f"Crie uma questão nível {nivel} sobre {tema_poo} em Java, contextualizada num sistema de {contexto_usuario}."
 
-
 # contexto
 
 print("\nCarregando exemplos do repositório...")
 exemplos = carregar_exemplos(CAMINHO_REPO, max_exemplos=2)
 
-# Exemplo de esqueleto para o shell.java, que mantém a responsabilidade para os alunos de implementar a lógica de classes e métodos.
+# exemplo de esqueleto para o shell.java, que mantém a responsabilidade para os alunos de implementar a lógica de classes e métodos.
 
 SHELL_ESQUELETO_EXEMPLO = """
 import java.util.ArrayList;
@@ -204,7 +378,7 @@ public class Shell {
 }
 """
 
-# ─── AGENTES ─────────────────────────────────────────────────────────────────
+# ─── agentes ─────────────────────────────────────────────────────────────────
 
 designer_criativo = Agent(
     role='Designer Instrucional de TI',
@@ -226,7 +400,21 @@ especialista_poo = Agent(
     llm=llm_revisao
 )
 
-# ─── TAREFAS ─────────────────────────────────────────────────────────────────
+auditor_tecnico = Agent(
+    role='Auditor Técnico de Qualidade',
+    goal='Produzir uma solução de referência completa e correta em Java a partir do enunciado, para validar a consistência técnica da questão.',
+    backstory=(
+        'Engenheiro de QA especialista em Java, focado em garantir que toda questão publicada '
+        'seja tecnicamente irretocável antes de chegar aos alunos. Não confia em enunciados: '
+        'implementa a solução do zero e deixa a compilação/execução real falarem por si.'
+    ),
+    verbose=False,
+    allow_delegation=False,
+    max_iter=2,
+    llm=llm_auditoria
+)
+
+# ─── tasks ──────────────────────────────────────────────────────
 
 tarefa_rascunho = Task(
     description=f"""Crie uma questão de programação para: "{entrada_usuario}".
@@ -347,7 +535,44 @@ Use EXATAMENTE este marcador:
     agent=especialista_poo
 )
 
-# ─── EXECUÇÃO ────────────────────────────────────────────────────────────────
+
+# ─── tasks do gabarito ──────────────────────────────────────────
+
+def criar_tarefa_gabarito(readme: str, shell: str) -> Task:
+    return Task(
+        description=f"""Você é o Auditor Técnico. Com base no enunciado (README) e no esqueleto (Shell.java)
+abaixo, implemente uma SOLUÇÃO DE REFERÊNCIA completa e funcional, preenchendo todos os TODOs
+com lógica correta.
+
+--- README ---
+{readme}
+
+--- SHELL.JAVA (ESQUELETO) ---
+{shell}
+
+REGRAS:
+- Mantenha a assinatura de todas as classes, atributos, construtores e métodos exatamente como
+  estão no esqueleto.
+- Implemente toda a lógica indicada pelos comentários TODO, de acordo com o que o README descreve.
+- Não altere o método main nem os comandos que ele reconhece.
+- O código deve compilar sem erros.
+- Não adicione texto explicativo fora do bloco de código.
+
+Use EXATAMENTE este marcador:
+
+IMPORTANTE: não envolva o código em blocos de código markdown (```). Escreva o Shell.java
+diretamente entre o marcador de abertura e <<<END>>>, sem cercas extras — o conteúdo vai direto
+para o compilador javac, então qualquer caractere fora do código Java quebra a compilação.
+
+<<<GABARITO>>>
+(Shell.java completo, com todas as classes implementadas)
+<<<END>>>""",
+        expected_output='Um bloco <<<GABARITO>>> com o Shell.java totalmente implementado, fechado com <<<END>>>.',
+        agent=auditor_tecnico
+    )
+
+
+# ─── execucao da geracao de questoes ────────────────────────────────────────────
 
 equipe = Crew(
     agents=[designer_criativo, especialista_poo],
@@ -356,9 +581,7 @@ equipe = Crew(
 )
 
 print("Gerando questão...\n")
-resultado = equipe.kickoff()
-
-# extração e salvamento
+equipe.kickoff()
 
 saidas = [str(t.output) for t in equipe.tasks if t.output]
 tudo = "\n".join(saidas)
@@ -367,13 +590,46 @@ readme = extrair_bloco(tudo, "README")
 toml   = extrair_bloco(tudo, "TOML")
 shell  = extrair_bloco(tudo, "SHELL")
 
-if readme and toml and shell:
-    salvar_arquivos(OUTPUT_DIR, nome_questao, readme, toml, shell)
-    print("✓ README.md")
-    print("✓ tests.toml")
-    print("✓ Shell.java")
-else:
+if not (readme and toml and shell):
     faltando = [n for n, v in [("README", readme), ("TOML", toml), ("SHELL", shell)] if not v]
     print(f"\nBlocos não encontrados: {faltando}")
     print("\nSaída bruta:\n")
     print(tudo)
+    raise SystemExit(1)
+
+salvar_arquivos(OUTPUT_DIR, nome_questao, readme, toml, shell)
+print("✓ README.md")
+print("✓ tests.toml")
+print("✓ Shell.java")
+
+
+# ─── execucao da auditoria (sem ciclo de correção ainda) ───────────────
+# por ora roda uma so vez, gera um gabarito, compila e executa contra tests.toml.
+# Se falhar, só reporta e salva o diagnóstico.
+
+print("\n=== Auditoria técnica ===")
+tarefa_gabarito = criar_tarefa_gabarito(readme, shell)
+crew_auditoria = Crew(agents=[auditor_tecnico], tasks=[tarefa_gabarito], process=Process.sequential)
+crew_auditoria.kickoff()
+
+gabarito = extrair_bloco(str(tarefa_gabarito.output), "GABARITO")
+aprovado = False
+
+if not gabarito:
+    print("✗ Auditor não retornou um bloco <<<GABARITO>>> válido.")
+    diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+else:
+    print("Compilando e executando o gabarito contra os casos de tests.toml...")
+    resultado = compilar_e_executar(gabarito, toml)
+    diagnostico = formatar_relatorio(resultado)
+    aprovado = resultado["sucesso"]
+
+    if aprovado:
+        print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
+    else:
+        print(f"✗ Falhas detectadas:\n{diagnostico}")
+
+if not aprovado:
+    log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
+    log_path.write_text(diagnostico, encoding="utf-8")
+    print(f"\nDiagnóstico salvo em: {log_path}")

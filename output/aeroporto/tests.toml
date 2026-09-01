@@ -1,0 +1,114 @@
+[[tests]]
+input = '''
+criarFuncionario Joao 30 123
+exibirInfo 123
+criarPiloto Maria 25 456 100
+exibirInfo 456
+criarComissario Jose 40 789 ingles frances
+exibirInfo 789
+end
+'''
+output = '''
+$criarFuncionario Joao 30 123
+$exibirInfo 123
+Nome: Joao, Idade: 30, Matricula: 123
+$criarPiloto Maria 25 456 100
+$exibirInfo 456
+Nome: Maria, Idade: 25, Matricula: 456, Horas de Voo: 100
+$criarComissario Jose 40 789 ingles frances
+$exibirInfo 789
+Nome: Jose, Idade: 40, Matricula: 789, Linguas: ingles, frances
+$end
+'''
+
+[[tests]]
+input = '''
+criarPiloto Pedro 35 111 50
+exibirInfo 111
+criarComissario Luiza 22 222 espanhol alemao
+exibirInfo 222
+criarFuncionario Carlos 50 333
+exibirInfo 333
+end
+'''
+output = '''
+$criarPiloto Pedro 35 111 50
+$exibirInfo 111
+Nome: Pedro, Idade: 35, Matricula: 111, Horas de Voo: 50
+$criarComissario Luiza 22 222 espanhol alemao
+$exibirInfo 222
+Nome: Luiza, Idade: 22, Matricula: 222, Linguas: espanhol, alemao
+$criarFuncionario Carlos 50 333
+$exibirInfo 333
+Nome: Carlos, Idade: 50, Matricula: 333
+$end
+'''
+
+[[tests]]
+input = '''
+criarFuncionario Beatriz 38 444
+exibirInfo 444
+criarPiloto Guilherme 42 555 200
+exibirInfo 555
+criarComissario Rafaela 29 666 portugues
+exibirInfo 666
+end
+'''
+output = '''
+$criarFuncionario Beatriz 38 444
+$exibirInfo 444
+Nome: Beatriz, Idade: 38, Matricula: 444
+$criarPiloto Guilherme 42 555 200
+$exibirInfo 555
+Nome: Guilherme, Idade: 42, Matricula: 555, Horas de Voo: 200
+$criarComissario Rafaela 29 666 portugues
+$exibirInfo 666
+Nome: Rafaela, Idade: 29, Matricula: 666, Linguas: portugues
+$end
+'''
+
+[[tests]]
+input = '''
+criarComissario Joana 26 777 ingles
+exibirInfo 777
+criarPiloto Leonardo 39 888 150
+exibirInfo 888
+criarFuncionario Sofia 24 999
+exibirInfo 999
+end
+'''
+output = '''
+$criarComissario Joana 26 777 ingles
+$exibirInfo 777
+Nome: Joana, Idade: 26, Matricula: 777, Linguas: ingles
+$criarPiloto Leonardo 39 888 150
+$exibirInfo 888
+Nome: Leonardo, Idade: 39, Matricula: 888, Horas de Voo: 150
+$criarFuncionario Sofia 24 999
+$exibirInfo 999
+Nome: Sofia, Idade: 24, Matricula: 999
+$end
+'''
+
+[[tests]]
+input = '''
+criarFuncionario Gabriel 32 1000
+exibirInfo 1000
+criarPiloto Isabella 27 1001 100
+exibirInfo 1001
+criarComissario Mateus 45 1002 espanhol
+exibirInfo 1002
+end
+'''
+output = '''
+$criarFuncionario Gabriel 32 1000
+$exibirInfo 1000
+Nome: Gabriel, Idade: 32, Matricula: 1000
+$criarPiloto Isabella 27 1001 100
+$exibirInfo 1001
+Nome: Isabella, Idade: 27, Matricula: 1001, Horas de Voo: 100
+$criarComissario Mateus 45 1002 espanhol
+$exibirInfo 1002
+Nome: Mateus, Idade: 45, Matricula: 1002, Linguas: espanhol
+$end
+'''

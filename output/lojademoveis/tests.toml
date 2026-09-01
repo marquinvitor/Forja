@@ -1,0 +1,44 @@
+[[tests]]
+input = '''
+addItem cadeira cadeira1 100.0 madeira
+show
+end
+'''
+output = '''
+$addItem cadeira cadeira1 100.0 madeira
+$show
+cadeira cadeira1 100.0 madeira
+$end
+'''
+
+[[tests]]
+input = '''
+addItem mesa mesa1 200.0 redonda
+addItem sofa sofa1 500.0 3
+show
+end
+'''
+output = '''
+$addItem mesa mesa1 200.0 redonda
+$addItem sofa sofa1 500.0 3
+$show
+mesa mesa1 200.0 redonda
+sofa sofa1 500.0 3
+$end
+'''
+
+[[tests]]
+input = '''
+addItem cadeira cadeira2 150.0 plastico
+addItem cadeira cadeira3 120.0 metal
+show
+end
+'''
+output = '''
+$addItem cadeira cadeira2 150.0 plastico
+$addItem cadeira cadeira3 120.0 metal
+$show
+cadeira cadeira2 150.0 plastico
+cadeira cadeira3 120.0 metal
+$end
+'''
