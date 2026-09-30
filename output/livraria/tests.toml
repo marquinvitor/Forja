@@ -1,0 +1,75 @@
+[[tests]]
+input = '''
+add livroFisico "Dom Casmurro" "Machado de Assis" 45.00 10
+add livroDigital "O Senhor dos Anéis" "J.R.R. Tolkien" 39.90 5
+listarLivros
+end
+'''
+output = '''
+$add livroFisico "Dom Casmurro" "Machado de Assis" 45.00 10
+$add livroDigital "O Senhor dos Anéis" "J.R.R. Tolkien" 39.90 5
+$listarLivros
+[ Dom Casmurro O Senhor dos Anéis ]
+$end
+'''
+
+[[tests]]
+input = '''
+add livroFisico "1984" "George Orwell" 25.50 0
+add livroDigital "Duna" "Frank Herbert" 60.00 3
+listarLivros
+end
+'''
+output = '''
+$add livroFisico "1984" "George Orwell" 25.50 0
+$add livroDigital "Duna" "Frank Herbert" 60.00 3
+$listarLivros
+[ Duna ]
+$end
+'''
+
+[[tests]]
+input = '''
+add livroFisico "Harry Potter" "J.K. Rowling" 55.90 15
+listarLivros
+add livroDigital "Harry Potter Digital" "J.K. Rowling" 45.00 20
+listarLivros
+end
+'''
+output = '''
+$add livroFisico "Harry Potter" "J.K. Rowling" 55.90 15
+$listarLivros
+[ Harry Potter ]
+$add livroDigital "Harry Potter Digital" "J.K. Rowling" 45.00 20
+$listarLivros
+[ Harry Potter Harry Potter Digital ]
+$end
+'''
+
+[[tests]]
+input = '''
+add livroFisico "Livro Vazio" "" 10.00 5
+listarLivros
+end
+'''
+output = '''
+$add livroFisico "Livro Vazio" "" 10.00 5
+$listarLivros
+[ Livro Vazio ]
+$end
+'''
+
+[[tests]]
+input = '''
+add livroDigital "Código Limpo" "Robert C. Martin" 89.99 2
+add livroFisico "Clean Code" "Robert C. Martin" 75.00 1
+listarLivros
+end
+'''
+output = '''
+$add livroDigital "Código Limpo" "Robert C. Martin" 89.99 2
+$add livroFisico "Clean Code" "Robert C. Martin" 75.00 1
+$listarLivros
+[ Código Limpo Clean Code ]
+$end
+'''

@@ -13,7 +13,7 @@ try:
     import tomllib
 except ImportError:
     try:
-        import tomli as tomllib  
+        import tomli as tomllib
     except ImportError:
         tomllib = None
 
@@ -251,30 +251,42 @@ def formatar_relatorio(resultado: dict) -> str:
     return "\n".join(linhas)
 
 
+def kickoff_seguro(crew: Crew, contexto: str) -> bool:
+    """Executa crew.kickoff() capturando erros de API (rate limit, resposta vazia, timeout etc.)
+    para não derrubar o processo inteiro com um stack trace e perder os artefatos já gerados."""
+    try:
+        crew.kickoff()
+        return True
+    except Exception as e:
+        print(f"\n⚠ Erro ao executar '{contexto}': {type(e).__name__}: {e}")
+        print("Interrompendo o ciclo de auditoria aqui e mantendo a última versão válida disponível.")
+        return False
+
+
 # config
 
 llm_rascunho = LLM(
-    model="openai/openai/gpt-oss-120b",
-    api_key=CHAVE_GROQ,
-    base_url="https://api.groq.com/openai/v1",
+    model="openai/qwen_qwen3.5-9b",
+    api_key="lm-studio",
+    base_url="http://26.98.110.23:1234/v1",
     temperature=0.5,
-    max_retries=3,
-    max_tokens=1500
-)
-
-llm_revisao = LLM(
-    model="openai/openai/gpt-oss-120b",
-    api_key=CHAVE_GROQ,
-    base_url="https://api.groq.com/openai/v1",
-    temperature=0.3,
     max_retries=3,
     max_tokens=2000
 )
 
+llm_revisao = LLM(
+    model="openai/qwen_qwen3.5-9b",
+    api_key="lm-studio",
+    base_url="http://26.98.110.23:1234/v1",
+    temperature=0.3,
+    max_retries=3,
+    max_tokens=6000
+)
+
 llm_auditoria = LLM(
-    model="openai/openai/gpt-oss-120b",
-    api_key=CHAVE_GROQ,
-    base_url="https://api.groq.com/openai/v1",
+    model="openai/qwen_qwen3.5-9b",
+    api_key="lm-studio",
+    base_url="http://26.98.110.23:1234/v1",
     temperature=0.2,
     max_retries=3,
     max_tokens=2500
@@ -536,7 +548,7 @@ Use EXATAMENTE este marcador:
 )
 
 
-# ─── tasks do gabarito ──────────────────────────────────────────
+# ─── tasks do ciclo de auditoria ──────────────────────────────────────────
 
 def criar_tarefa_gabarito(readme: str, shell: str) -> Task:
     return Task(
@@ -572,6 +584,55 @@ para o compilador javac, então qualquer caractere fora do código Java quebra a
     )
 
 
+def criar_tarefa_correcao(readme: str, toml: str, shell: str, diagnostico: str, contexto: str) -> Task:
+    return Task(
+        description=f"""A questão abaixo falhou na auditoria técnica automática. Corrija o README.md, o
+tests.toml e/ou o Shell.java para eliminar os problemas apontados no relatório de diagnóstico.
+
+--- RELATÓRIO DE DIAGNÓSTICO (compilação/execução real) ---
+{diagnostico}
+
+--- README ATUAL ---
+{readme}
+
+--- TESTS.TOML ATUAL ---
+{toml}
+
+--- SHELL.JAVA ATUAL (ESQUELETO) ---
+{shell}
+
+INSTRUÇÕES:
+- Identifique a causa raiz: pode ser um esqueleto mal especificado (assinatura, tipo de retorno),
+  um caso de teste com entrada/saída incorreta, ou uma inconsistência entre o enunciado e os
+  comandos aceitos pelo Shell.
+- Corrija apenas o necessário para eliminar a divergência relatada, sem descaracterizar a questão.
+- Preserve o contexto "{contexto}" e o nível de dificuldade original.
+- O tests.toml deve continuar seguindo o formato input/output com comandos de texto simples
+  (nunca código Java), com parâmetros separados por espaço, e terminar cada input com "end".
+- O Shell.java entregue aqui continua sendo um ESQUELETO (com TODOs) — não inclua a lógica de
+  solução nele, apenas corrija assinaturas/estrutura se for essa a causa da falha.
+
+Use EXATAMENTE estes marcadores:
+
+IMPORTANTE: não envolva nenhum dos três blocos em cercas de código markdown (```). Escreva cada
+conteúdo diretamente entre seu marcador de abertura e <<<END>>>.
+
+<<<README>>>
+(README.md corrigido)
+<<<END>>>
+
+<<<TOML>>>
+(tests.toml corrigido)
+<<<END>>>
+
+<<<SHELL>>>
+(Shell.java corrigido, ainda como esqueleto com TODOs)
+<<<END>>>""",
+        expected_output='Três blocos <<<README>>>, <<<TOML>>> e <<<SHELL>>>, cada um fechado com <<<END>>>.',
+        agent=especialista_poo
+    )
+
+
 # ─── execucao da geracao de questoes ────────────────────────────────────────────
 
 equipe = Crew(
@@ -581,55 +642,100 @@ equipe = Crew(
 )
 
 print("Gerando questão...\n")
-equipe.kickoff()
+if not kickoff_seguro(equipe, "geração do rascunho inicial"):
+    raise SystemExit(1)
 
 saidas = [str(t.output) for t in equipe.tasks if t.output]
 tudo = "\n".join(saidas)
 
-readme = extrair_bloco(tudo, "README")
-toml   = extrair_bloco(tudo, "TOML")
-shell  = extrair_bloco(tudo, "SHELL")
+readme_atual = extrair_bloco(tudo, "README")
+toml_atual   = extrair_bloco(tudo, "TOML")
+shell_atual  = extrair_bloco(tudo, "SHELL")
 
-if not (readme and toml and shell):
-    faltando = [n for n, v in [("README", readme), ("TOML", toml), ("SHELL", shell)] if not v]
+if not (readme_atual and toml_atual and shell_atual):
+    faltando = [n for n, v in [("README", readme_atual), ("TOML", toml_atual), ("SHELL", shell_atual)] if not v]
     print(f"\nBlocos não encontrados: {faltando}")
     print("\nSaída bruta:\n")
     print(tudo)
     raise SystemExit(1)
 
-salvar_arquivos(OUTPUT_DIR, nome_questao, readme, toml, shell)
+
+# ─── ciclo de auditoria e correção ───────────────────────────────────────────
+# a cada tentativa: gera um gabarito, compila e executa contra o tests.toml atual.
+# se falhar, manda o diagnóstico pro especialista_poo corrigir, e tenta de novo.
+
+MAX_TENTATIVAS = 3
+aprovado = False
+gabarito_atual = ""
+diagnostico = ""
+
+for tentativa in range(1, MAX_TENTATIVAS + 1):
+    print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
+
+    tarefa_gabarito = criar_tarefa_gabarito(readme_atual, shell_atual)
+    crew_auditoria = Crew(agents=[auditor_tecnico], tasks=[tarefa_gabarito], process=Process.sequential)
+    if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
+        diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
+        break
+
+    gabarito_atual = extrair_bloco(str(tarefa_gabarito.output), "GABARITO")
+
+    if not gabarito_atual:
+        print("Auditor não retornou um bloco <<<GABARITO>>> válido.")
+        diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+    else:
+        print("Compilando e executando o gabarito contra os casos de tests.toml...")
+        resultado = compilar_e_executar(gabarito_atual, toml_atual)
+        diagnostico = formatar_relatorio(resultado)
+
+        if resultado["sucesso"]:
+            print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
+            aprovado = True
+            break
+
+    print(f"✗ Falhas detectadas:\n{diagnostico}")
+
+    if tentativa == MAX_TENTATIVAS:
+        print("\nLimite de tentativas atingido sem consistência técnica total.")
+        break
+
+    print("Enviando relatório de diagnóstico ao Especialista para correção...")
+    tarefa_correcao = criar_tarefa_correcao(readme_atual, toml_atual, shell_atual, diagnostico, contexto_usuario)
+    crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
+    if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
+        break
+
+    saida_correcao = str(tarefa_correcao.output)
+    novo_readme = extrair_bloco(saida_correcao, "README")
+    novo_toml   = extrair_bloco(saida_correcao, "TOML")
+    novo_shell  = extrair_bloco(saida_correcao, "SHELL")
+
+    if novo_readme and novo_toml and novo_shell:
+        readme_atual, toml_atual, shell_atual = novo_readme, novo_toml, novo_shell
+    else:
+        print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
+
+
+# ─── salvamento (só no final, depois do ciclo) ───────────────────────────────
+
+status = (
+    "APROVADA na auditoria técnica"
+    if aprovado
+    else f"NÃO validada após {MAX_TENTATIVAS} tentativas (recomenda-se revisão manual)"
+)
+print(f"\nStatus final da questão: {status}")
+
+salvar_arquivos(OUTPUT_DIR, nome_questao, readme_atual, toml_atual, shell_atual)
 print("✓ README.md")
 print("✓ tests.toml")
 print("✓ Shell.java")
 
-
-# ─── execucao da auditoria (sem ciclo de correção ainda) ───────────────
-# por ora roda uma so vez, gera um gabarito, compila e executa contra tests.toml.
-# Se falhar, só reporta e salva o diagnóstico.
-
-print("\n=== Auditoria técnica ===")
-tarefa_gabarito = criar_tarefa_gabarito(readme, shell)
-crew_auditoria = Crew(agents=[auditor_tecnico], tasks=[tarefa_gabarito], process=Process.sequential)
-crew_auditoria.kickoff()
-
-gabarito = extrair_bloco(str(tarefa_gabarito.output), "GABARITO")
-aprovado = False
-
-if not gabarito:
-    print("✗ Auditor não retornou um bloco <<<GABARITO>>> válido.")
-    diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
-else:
-    print("Compilando e executando o gabarito contra os casos de tests.toml...")
-    resultado = compilar_e_executar(gabarito, toml)
-    diagnostico = formatar_relatorio(resultado)
-    aprovado = resultado["sucesso"]
-
-    if aprovado:
-        print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
-    else:
-        print(f"✗ Falhas detectadas:\n{diagnostico}")
+if gabarito_atual:
+    solucao_path = Path(OUTPUT_DIR) / nome_questao / "Solucao.java"
+    solucao_path.write_text(gabarito_atual, encoding="utf-8")
+    print(f"✓ Solução do auditor salva em: {solucao_path}")
 
 if not aprovado:
     log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
     log_path.write_text(diagnostico, encoding="utf-8")
-    print(f"\nDiagnóstico salvo em: {log_path}")
+    print(f"✗ Diagnóstico final salvo em: {log_path}")

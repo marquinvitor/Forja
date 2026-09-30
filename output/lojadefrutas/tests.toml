@@ -1,0 +1,29 @@
+[[tests]]
+input = '''
+init 10
+addFruit banana 1.00 Brazil
+show
+end
+'''
+output = '''
+$init 10
+$addFruit banana 1.00 Brazil
+$show
+banana 1.05 Brazil
+$end
+'''
+
+[[tests]]
+input = '''
+init 5
+addExotic kiwi 2.00 NewZealand
+show
+end
+'''
+output = '''
+$init 5
+$addExotic kiwi 2.00 NewZealand
+$show
+kiwi 2.30 NewZealand
+$end
+'''

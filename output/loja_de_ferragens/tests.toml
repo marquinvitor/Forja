@@ -1,0 +1,144 @@
+[[tests]]
+input = '''
+init Parafuso M5 2.0 30.00
+show
+vender
+show
+end
+'''
+output = '''
+$init Parafuso M5 2.0 30.00
+$show
+nome=Parafuso | preco=30.00 | estoque=0 | tipo=parafuso (d=2.0, L=30.0)
+$vender
+fail: dimensões inválidas (d<3.0 ou L<10.0)
+$show
+nome=Parafuso | preco=30.00 | estoque=0 | tipo=parafuso (d=2.0, L=30.0)
+$end
+'''
+
+[[tests]]
+input = '''
+init Parafuso M5 4.0 50.00
+vender
+show
+vender
+show
+end
+'''
+output = '''
+$init Parafuso M5 4.0 50.00
+$vender
+nome=Parafuso | preco=50.00 | estoque=1 | tipo=parafuso (d=4.0, L=50.0)
+$show
+nome=Parafuso | preco=50.00 | estoque=0 | tipo=parafuso (d=4.0, L=50.0)
+$vender
+fail: estoque insuficiente
+$show
+nome=Parafuso | preco=50.00 | estoque=0 | tipo=parafuso (d=4.0, L=50.0)
+$end
+'''
+
+[[tests]]
+input = '''
+init KitFerramental "Básico" 120.00 ["Parafuso M3", "Porca M3"]
+show
+vender
+show
+end
+'''
+output = '''
+$init KitFerramental "Básico" 120.00 ["Parafuso M3", "Porca M3"]
+$show
+nome=KitFerramental | preco=120.00 | estoque=0 | tipo=kit (itens=["Parafuso M3", "Porca M3"])
+$vender
+fail: item indisponível no kit
+$show
+nome=KitFerramental | preco=120.00 | estoque=0 | tipo=kit (itens=["Parafuso M3", "Porca M3"])
+$end
+'''
+
+[[tests]]
+input = '''
+init KitFerramental "Premium" 500.00 ["Parafuso M8", "Porca M8"]
+show
+vender
+show
+vender
+show
+end
+'''
+output = '''
+$init KitFerramental "Premium" 500.00 ["Parafuso M8", "Porca M8"]
+$show
+nome=KitFerramental | preco=500.00 | estoque=2 | tipo=kit (itens=["Parafuso M8", "Porca M8"])
+$vender
+nome=KitFerramental | preco=500.00 | estoque=1 | tipo=kit (itens=["Parafuso M8", "Porca M8"])
+$show
+nome=KitFerramental | preco=500.00 | estoque=0 | tipo=kit (itens=["Parafuso M8", "Porca M8"])
+$vender
+fail: item indisponível no kit
+$show
+nome=KitFerramental | preco=500.00 | estoque=0 | tipo=kit (itens=["Parafuso M8", "Porca M8"])
+$end
+'''
+
+[[tests]]
+input = '''
+init Parafuso M6 3.5 15.00
+vender
+show
+init Parafuso M4 2.0 10.00
+vender
+show
+end
+'''
+output = '''
+$init Parafuso M6 3.5 15.00
+$vender
+nome=Parafuso | preco=15.00 | estoque=1 | tipo=parafuso (d=3.5, L=15.0)
+$show
+nome=Parafuso | preco=15.00 | estoque=0 | tipo=parafuso (d=3.5, L=15.0)
+$init Parafuso M4 2.0 10.00
+$vender
+fail: dimensões inválidas (d<3.0 ou L<10.0)
+$show
+nome=Parafuso | preco=10.00 | estoque=0 | tipo=parafuso (d=2.0, L=10.0)
+$end
+'''
+
+[[tests]]
+input = '''
+init KitFerramental "Avancado" 800.00 ["Parafuso M6", "Porca M6"]
+show
+vender
+show
+init Parafuso M6 3.5 15.00
+init Porca M6 2.0 5.00
+show
+vender
+show
+end
+'''
+output = '''
+$init KitFerramental "Avancado" 800.00 ["Parafuso M6", "Porca M6"]
+$show
+nome=KitFerramental | preco=800.00 | estoque=2 | tipo=kit (itens=["Parafuso M6", "Porca M6"])
+$vender
+fail: item indisponível no kit
+$show
+nome=KitFerramental | preco=800.00 | estoque=2 | tipo=kit (itens=["Parafuso M6", "Porca M6"])
+$init Parafuso M6 3.5 15.00
+$init Porca M6 2.0 5.00
+$show
+nome=Parafuso | preco=15.00 | estoque=1 | tipo=parafuso (d=3.5, L=15.0)
+$vender
+nome=Parafuso | preco=15.00 | estoque=0 | tipo=parafuso (d=3.5, L=15.0)
+$show
+nome=Porca | preco=5.00 | estoque=1 | tipo=parafuso (d=2.0, L=5.0)
+$vender
+fail: dimensões inválidas (d<3.0 ou L<10.0)
+$show
+nome=Porca | preco=5.00 | estoque=1 | tipo=parafuso (d=2.0, L=5.0)
+$end
+'''

@@ -1,0 +1,5 @@
+Etapa com falha: compilacao
+Shell.java:4: error: Produto is not abstract and does not override abstract method vender() in Produto
+class Produto {
+^
+1 error
