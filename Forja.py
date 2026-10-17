@@ -1,5 +1,4 @@
 import os
-import random
 import re
 import shutil
 import subprocess
@@ -9,27 +8,19 @@ from crewai import Agent, Task, Crew, Process, LLM
 import litellm
 from dotenv import load_dotenv
 
-try:
-    import tomllib
-except ImportError:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
+from topicos_poo import preparar, TOPICOS
 
 load_dotenv()
 
-CHAVE_GROQ   = os.getenv("GROQ_API_KEY")
-CAMINHO_REPO = os.getenv("CAMINHO_REPO", os.path.expanduser("~/arcade/base"))
-OUTPUT_DIR   = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/output"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+CAMINHO_REPO   = os.getenv("CAMINHO_REPO", os.path.expanduser("~/arcade/base"))
+OUTPUT_DIR     = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/output"))
 
-if not CHAVE_GROQ:
-    raise ValueError("GROQ_API_KEY não encontrada no .env")
+TIPOS_VALIDOS  = ["GUIDE", "TRAIN", "ALONE", "CHECK"]
+MAX_TENTATIVAS = 3
 
-if tomllib is None:
-    raise ImportError(
-        "nenhum parser TOML disponivel"
-    )
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY não encontrada no .env")
 
 # gambiarra pra nao usar cache
 litellm.cache = None
@@ -50,53 +41,10 @@ litellm.completion = _safe_completion
 os.environ["CREWAI_DISABLE_PROMPT_CACHING"] = "true"
 
 
-def carregar_exemplos(caminho_base: str, max_exemplos: int = 2) -> str:
-    base = Path(caminho_base)
-    questoes = [
-        d for d in base.iterdir()
-        if d.is_dir()
-        and not d.name.startswith("+")
-        and (d / "README.md").exists()
-        and (d / "tests.toml").exists()
-    ]
-
-    selecionadas = random.sample(questoes, min(max_exemplos, len(questoes)))
-    print(f"Exemplos escolhidos: {', '.join(q.name for q in selecionadas)}")
-
-    contexto = ""
-    for questao in selecionadas:
-        readme = (questao / "README.md").read_text(encoding="utf-8")
-        testes = (questao / "tests.toml").read_text(encoding="utf-8")
-
-        secao_intro = ""
-        secoes = readme.split("## ")
-        for secao in secoes:
-            if secao.startswith("Intro"):
-                secao_intro = secao.strip()
-
-        contexto += f"""
-=== EXEMPLO: {questao.name} ===
---- ENUNCIADO ---
-{secao_intro[:600]}
-
---- TESTES ---
-{testes[:500]}
-
-"""
-    return contexto.strip()
-
-
-def salvar_arquivos(output_dir: str, nome: str, readme: str, toml: str, shell: str):
-    pasta = Path(output_dir) / nome
-    pasta.mkdir(parents=True, exist_ok=True)
-    (pasta / "README.md").write_text(readme, encoding="utf-8")
-    (pasta / "tests.toml").write_text(toml, encoding="utf-8")
-    (pasta / "Shell.java").write_text(shell, encoding="utf-8")
-    print(f"\nArquivos salvos em: {pasta}")
-
+# ─── blocos de texto gerados pelos agentes ───────────────────────────────────
 
 def _limpar_cercas_markdown(texto: str) -> str:
-    """tira aqueles marcadores ```java ... que ficavam saindo no shell"""
+    """tira aqueles marcadores ```kotlin ... que ficavam saindo nos blocos"""
     texto = texto.strip()
     texto = re.sub(r"^```[a-zA-Z0-9_-]*[ \t]*\n?", "", texto)
     texto = re.sub(r"\n?```[ \t]*$", "", texto)
@@ -112,12 +60,86 @@ def extrair_bloco(texto: str, marcador: str) -> str:
     return _limpar_cercas_markdown(bruto)
 
 
-# ─── parsing e execução do Java ─────────────────────
+def extrair_codigo(texto: str, marcador: str) -> str:
+    """Como extrair_bloco, mas tolerante para CÓDIGO: aceita resposta cortada (sem <<<END>>>)
+    e, como último recurso, pega o primeiro bloco ``` da resposta."""
+    codigo = extrair_bloco(texto, marcador)
+    if codigo:
+        return codigo
+    abre = f"<<<{marcador}>>>"
+    ini = texto.find(abre)
+    if ini != -1:
+        resto = texto[ini + len(abre):]
+        prox = re.search(r"<<<[A-Z]+>>>", resto)
+        if prox:
+            resto = resto[:prox.start()]
+        return _limpar_cercas_markdown(resto.replace("<<<END>>>", "").strip())
+    m = re.search(r"```(?:kotlin|kt)?[ \t]*\n(.*?)```", texto, re.DOTALL)
+    return m.group(1).strip() if m else ""
 
-def parse_testes_toml(toml_str: str) -> list[dict]:
-    dados = tomllib.loads(toml_str)
-    return dados.get("tests", [])
 
+# ─── testes: agora vivem dentro do README, em blocos ```bash ─────────────────
+# Cada caso:
+#   #TEST_CASE nome
+#
+#   $comando digitado        <- linhas com "$" são a ENTRADA (o programa as repete)
+#   saída do programa        <- o caso inteiro é a SAÍDA esperada
+#   $end
+
+def parsear_casos(texto: str) -> list[dict]:
+    casos, atual = [], None
+    for linha in texto.splitlines():
+        if linha.startswith("#TEST_CASE"):
+            if atual:
+                casos.append(atual)
+            atual = {"nome": linha[len("#TEST_CASE"):].strip() or f"teste{len(casos) + 1}", "linhas": []}
+        elif atual is not None:
+            atual["linhas"].append(linha.rstrip())
+    if atual:
+        casos.append(atual)
+
+    testes = []
+    for c in casos:
+        linhas = list(c["linhas"])
+        while linhas and not linhas[0].strip():
+            linhas.pop(0)
+        while linhas and not linhas[-1].strip():
+            linhas.pop()
+        entradas = [l[1:] for l in linhas if l.startswith("$")]
+        if entradas:
+            testes.append({"nome": c["nome"], "input": "\n".join(entradas) + "\n", "output": "\n".join(linhas)})
+    return testes
+
+
+def extrair_testes_readme(readme: str) -> list[dict]:
+    blocos = re.findall(r"```bash[ \t]*\n(.*?)```", readme, re.DOTALL)
+    return parsear_casos("\n".join(blocos))
+
+
+def inserir_guia(readme: str, esqueleto: str) -> str:
+    """Coloca o esqueleto numa seção '## Guide' logo antes de '## Shell' (formato do repositório)."""
+    if "## Guide" in readme:
+        return readme
+    guia = f"## Guide\n\n```kotlin\n{esqueleto.strip()}\n```\n\n"
+    if "## Shell" in readme:
+        return readme.replace("## Shell", guia + "## Shell", 1)
+    return readme.rstrip() + "\n\n" + guia
+
+
+def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str):
+    pasta = Path(output_dir) / nome
+    (pasta / "assets").mkdir(parents=True, exist_ok=True)
+    (pasta / "src" / "kt").mkdir(parents=True, exist_ok=True)
+    (pasta / "README.md").write_text(readme, encoding="utf-8")
+    if solucao:
+        (pasta / "src" / "kt" / "main.kt").write_text(solucao, encoding="utf-8")
+    print(f"\nQuestão salva em: {pasta}")
+    print("✓ README.md (enunciado, esqueleto e testes)")
+    print("✓ src/kt/main.kt (solução do auditor)" if solucao else "⚠ Sem solução para salvar em src/kt/")
+    print("⚠ Falta adicionar a capa: assets/cover.webp")
+
+
+# ─── compilação e execução do Kotlin ─────────────────────────────────────────
 
 def _normalizar(saida: str) -> str:
     return "\n".join(linha.rstrip() for linha in saida.strip("\n").splitlines())
@@ -127,127 +149,69 @@ def comparar_saida(esperado: str, obtido: str) -> bool:
     return _normalizar(esperado) == _normalizar(obtido)
 
 
-def compilar_e_executar(shell_java: str, toml_str: str, timeout_execucao: int = 10) -> dict:
-    """compila o gabarito e executa cada caso de tests.toml contra ele,
-    Retorna um dicionário com o resultado."""
+def compilar_e_executar(codigo_kt: str, testes: list[dict], timeout_execucao: int = 15) -> dict:
+    """compila a solução com kotlinc e executa cada caso de teste (extraídos do README)."""
 
-    if shutil.which("javac") is None or shutil.which("java") is None:
-        return {
-            "sucesso": False,
-            "etapa": "ambiente",
-            "detalhe": "javac/java não encontrados no PATH. Instale um JDK para habilitar a auditoria automática.",
-            "resultados": [],
-        }
-
-    try:
-        testes = parse_testes_toml(toml_str)
-    except Exception as e:
-        return {
-            "sucesso": False,
-            "etapa": "parse_toml",
-            "detalhe": f"Falha ao interpretar tests.toml: {e}",
-            "resultados": [],
-        }
+    if shutil.which("kotlinc") is None or shutil.which("java") is None:
+        return {"sucesso": False, "etapa": "ambiente", "resultados": [],
+                "detalhe": "kotlinc/java não encontrados no PATH. Instale com SDKMAN: 'sdk install kotlin' (e um JDK)."}
 
     if not testes:
-        return {
-            "sucesso": False,
-            "etapa": "parse_toml",
-            "detalhe": "Nenhum caso de teste encontrado em tests.toml (bloco [[tests]] ausente ou vazio).",
-            "resultados": [],
-        }
+        return {"sucesso": False, "etapa": "testes", "resultados": [],
+                "detalhe": "Nenhum caso de teste válido no README (use blocos ```bash com '#TEST_CASE nome' e linhas '$comando')."}
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        (tmp_path / "Shell.java").write_text(shell_java, encoding="utf-8")
+        (tmp_path / "main.kt").write_text(codigo_kt, encoding="utf-8")
 
         try:
             compilacao = subprocess.run(
-                ["javac", "Shell.java"],
-                cwd=tmp_path,
-                capture_output=True,
-                text=True,
-                timeout=30,
+                ["kotlinc", "main.kt", "-include-runtime", "-d", "main.jar"],
+                cwd=tmp_path, capture_output=True, text=True, timeout=240,  # kotlinc é lento na 1ª vez
             )
         except subprocess.TimeoutExpired:
-            return {
-                "sucesso": False,
-                "etapa": "compilacao",
-                "detalhe": "Timeout ao compilar (> 30s).",
-                "resultados": [],
-            }
+            return {"sucesso": False, "etapa": "compilacao", "detalhe": "Timeout ao compilar (> 240s).", "resultados": []}
 
         if compilacao.returncode != 0:
-            return {
-                "sucesso": False,
-                "etapa": "compilacao",
-                "detalhe": compilacao.stderr.strip()[:2000],
-                "resultados": [],
-            }
+            return {"sucesso": False, "etapa": "compilacao", "resultados": [],
+                    "detalhe": (compilacao.stderr or compilacao.stdout).strip()[:2000]}
 
-        resultados = []
-        todos_ok = True
-
+        resultados, todos_ok = [], True
         for i, teste in enumerate(testes, start=1):
-            entrada = teste.get("input", "")
-            esperado = teste.get("output", "")
-
+            nome = teste["nome"]
             try:
-                execucao = subprocess.run(
-                    ["java", "Shell"],
-                    cwd=tmp_path,
-                    input=entrada,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_execucao,
-                )
+                ex = subprocess.run(["java", "-jar", "main.jar"], cwd=tmp_path, input=teste["input"],
+                                    capture_output=True, text=True, timeout=timeout_execucao)
             except subprocess.TimeoutExpired:
                 todos_ok = False
-                resultados.append({
-                    "teste": i,
-                    "ok": False,
-                    "detalhe": f"Timeout (> {timeout_execucao}s) — possível loop infinito ou leitura de entrada além do esperado.",
-                })
+                resultados.append({"teste": i, "nome": nome, "ok": False,
+                                   "detalhe": f"Timeout (> {timeout_execucao}s) — possível loop infinito ou leitura além do esperado."})
                 continue
 
-            if execucao.returncode != 0 and execucao.stderr.strip():
+            if ex.returncode != 0 and ex.stderr.strip():
                 todos_ok = False
-                resultados.append({
-                    "teste": i,
-                    "ok": False,
-                    "detalhe": f"Exceção em tempo de execução:\n{execucao.stderr.strip()[:800]}",
-                })
-                continue
-
-            obtido = execucao.stdout
-            if comparar_saida(esperado, obtido):
-                resultados.append({"teste": i, "ok": True})
+                resultados.append({"teste": i, "nome": nome, "ok": False,
+                                   "detalhe": f"Exceção em tempo de execução:\n{ex.stderr.strip()[:800]}"})
+            elif comparar_saida(teste["output"], ex.stdout):
+                resultados.append({"teste": i, "nome": nome, "ok": True})
             else:
                 todos_ok = False
-                resultados.append({
-                    "teste": i,
-                    "ok": False,
-                    "detalhe": f"Saída divergente.\n--- Esperado ---\n{esperado.strip()}\n--- Obtido ---\n{obtido.strip()}",
-                })
+                resultados.append({"teste": i, "nome": nome, "ok": False,
+                                   "detalhe": f"Saída divergente.\n--- Esperado ---\n{teste['output'].strip()}\n--- Obtido ---\n{ex.stdout.strip()}"})
 
-        return {
-            "sucesso": todos_ok,
-            "etapa": "execucao" if todos_ok else "testes",
-            "detalhe": "" if todos_ok else "Um ou mais casos de teste falharam.",
-            "resultados": resultados,
-        }
+        return {"sucesso": todos_ok, "etapa": "execucao" if todos_ok else "testes",
+                "detalhe": "" if todos_ok else "Um ou mais casos de teste falharam.", "resultados": resultados}
 
 
 def formatar_relatorio(resultado: dict) -> str:
     if resultado["sucesso"]:
         return "Todos os testes passaram. Compilação e execução consistentes."
-
     linhas = [f"Etapa com falha: {resultado['etapa']}"]
     if resultado.get("detalhe"):
         linhas.append(resultado["detalhe"])
     for r in resultado.get("resultados", []):
         if not r["ok"]:
-            linhas.append(f"\n--- Teste {r['teste']} ---\n{r.get('detalhe', '')}")
+            linhas.append(f"\n--- Teste {r['teste']} ({r.get('nome', '')}) ---\n{r.get('detalhe', '')}")
     return "\n".join(linhas)
 
 
@@ -263,138 +227,41 @@ def kickoff_seguro(crew: Crew, contexto: str) -> bool:
         return False
 
 
-# config
+# config  (troque pelos modelos que você escolheu; o pensamento conta no max_tokens, então deixe folga)
 
 llm_rascunho = LLM(
-    model="openai/qwen_qwen3.5-9b",
-    api_key="lm-studio",
-    base_url="http://26.98.110.23:1234/v1",
-    temperature=0.5,
+    model="gemini/gemini-3.5-flash-lite",
+    api_key=GEMINI_API_KEY,
+    temperature=1.0,
     max_retries=3,
-    max_tokens=2000
+    timeout=600,
+    max_tokens=8000
 )
 
 llm_revisao = LLM(
-    model="openai/qwen_qwen3.5-9b",
-    api_key="lm-studio",
-    base_url="http://26.98.110.23:1234/v1",
-    temperature=0.3,
+    model="gemini/gemini-3.8-flash",
+    api_key=GEMINI_API_KEY,
+    temperature=1.0,
     max_retries=3,
-    max_tokens=6000
+    timeout=600,
+    max_tokens=16000
 )
 
 llm_auditoria = LLM(
-    model="openai/qwen_qwen3.5-9b",
-    api_key="lm-studio",
-    base_url="http://26.98.110.23:1234/v1",
-    temperature=0.2,
+    model="gemini/gemini-3.5-flash-lite",
+    api_key=GEMINI_API_KEY,
+    temperature=1.0,
     max_retries=3,
-    max_tokens=2500
+    timeout=600,
+    max_tokens=16000
 )
 
-
-# Input do usuario
-
-print("=== Gerador de Questões POO ===\n")
-contexto_usuario = input("Contexto da questão (ex: concessionaria, aeroporto, biblioteca): ").strip()
-nivel            = input("Nível (Fácil / Médio / Difícil): ").strip()
-tema_poo         = input("Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento): ").strip()
-nome_questao     = contexto_usuario.lower().replace(" ", "_")
-
-entrada_usuario = f"Crie uma questão nível {nivel} sobre {tema_poo} em Java, contextualizada num sistema de {contexto_usuario}."
-
-# contexto
-
-print("\nCarregando exemplos do repositório...")
-exemplos = carregar_exemplos(CAMINHO_REPO, max_exemplos=2)
-
-# exemplo de esqueleto para o shell.java, que mantém a responsabilidade para os alunos de implementar a lógica de classes e métodos.
-
-SHELL_ESQUELETO_EXEMPLO = """
-import java.util.ArrayList;
-import java.util.Scanner;
-
-// ── EXEMPLO DE CONTEXTO: piscina / atletas ────────────────────────────────
-// As classes abaixo mostram o PADRÃO esperado de esqueleto.
-// O modelo deve criar classes equivalentes para o contexto da questão gerada.
-
-class Atleta {
-    String nome;
-    int idade;
-    int experiencia;
-
-    public Atleta(String nome, int idade, int experiencia) {
-        // TODO: inicialize os atributos
-    }
-
-    public String getInfo() {
-        // TODO: retorne as informações do atleta formatadas
-        return "";
-    }
-}
-
-class Nadador extends Atleta {
-    String estilo;
-    double tempoMedio;
-
-    public Nadador(String nome, int idade, int experiencia, String estilo, double tempoMedio) {
-        super(nome, idade, experiencia);
-        // TODO: inicialize os atributos específicos de Nadador
-    }
-
-    public String getDesempenho() {
-        // TODO: retorne "ouro", "prata" ou "bronze" com base no tempoMedio
-        return "";
-    }
-
-    @Override
-    public String getInfo() {
-        // TODO: retorne as informações completas do nadador
-        return "";
-    }
-}
-
-public class Shell {
-    static Scanner scanner = new Scanner(System.in);
-    static ArrayList<Atleta> atletas = new ArrayList<>();
-
-    public static void main(String[] _args) {
-        while (true) {
-            var line = scanner.nextLine();
-            System.out.println("$" + line);
-            var par = line.split(" ");
-            var cmd = par[0];
-            if (cmd.equals("end")) {
-                break;
-            } else if (cmd.equals("addAtleta")) {
-                var nome = par[1];
-                var idade = Integer.parseInt(par[2]);
-                var experiencia = Integer.parseInt(par[3]);
-                atletas.add(new Atleta(nome, idade, experiencia));
-            } else if (cmd.equals("addNadador")) {
-                var nome = par[1];
-                var idade = Integer.parseInt(par[2]);
-                var experiencia = Integer.parseInt(par[3]);
-                var estilo = par[4];
-                var tempoMedio = Double.parseDouble(par[5]);
-                atletas.add(new Nadador(nome, idade, experiencia, estilo, tempoMedio));
-            } else if (cmd.equals("show")) {
-                for (Atleta a : atletas) {
-                    System.out.println(a.getInfo());
-                }
-            } else {
-                System.out.println("fail: comando invalido\\n");
-            }
-        }
-    }
-}
-"""
 
 # ─── agentes ─────────────────────────────────────────────────────────────────
 
 designer_criativo = Agent(
     role='Designer Instrucional de TI',
-    goal='Criar enunciados claros no nível de dificuldade solicitado.',
+    goal='Criar enunciados claros aplicando os tópicos pedidos exatamente como o repositório os aplica.',
     backstory='Professor que transforma conceitos de programação em desafios práticos.',
     verbose=False,
     allow_delegation=False,
@@ -403,9 +270,9 @@ designer_criativo = Agent(
 )
 
 especialista_poo = Agent(
-    role='Especialista em POO Java',
-    goal='Garantir rigor técnico, sintaxe correta e gerar os arquivos finais.',
-    backstory='Desenvolvedor sênior com foco em design patterns e ensino de POO.',
+    role='Especialista em POO Kotlin',
+    goal='Garantir rigor técnico, sintaxe correta e gerar os arquivos finais em Kotlin.',
+    backstory='Desenvolvedor sênior de Kotlin com foco em design patterns e ensino de POO.',
     verbose=False,
     allow_delegation=False,
     max_iter=2,
@@ -414,9 +281,9 @@ especialista_poo = Agent(
 
 auditor_tecnico = Agent(
     role='Auditor Técnico de Qualidade',
-    goal='Produzir uma solução de referência completa e correta em Java a partir do enunciado, para validar a consistência técnica da questão.',
+    goal='Produzir uma solução de referência completa e correta em Kotlin a partir do enunciado, para validar a consistência técnica da questão.',
     backstory=(
-        'Engenheiro de QA especialista em Java, focado em garantir que toda questão publicada '
+        'Engenheiro de QA especialista em Kotlin, focado em garantir que toda questão publicada '
         'seja tecnicamente irretocável antes de chegar aos alunos. Não confia em enunciados: '
         'implementa a solução do zero e deixa a compilação/execução real falarem por si.'
     ),
@@ -426,124 +293,296 @@ auditor_tecnico = Agent(
     llm=llm_auditoria
 )
 
-# ─── tasks ──────────────────────────────────────────────────────
 
-tarefa_rascunho = Task(
-    description=f"""Crie uma questão de programação para: "{entrada_usuario}".
+def chamar_llm(prompt: str) -> str:
+    """Chamada simples ao LLM (detectar tópicos / resumir exemplos). Se falhar, devolve '' em vez de derrubar o programa."""
+    try:
+        return str(llm_auditoria.call([{"role": "user", "content": prompt}]))
+    except Exception as e:
+        print(f"⚠ chamar_llm falhou: {type(e).__name__}: {e}")
+        return ""
 
-Exemplos do repositório para seguir o formato:
-{exemplos}
 
-Sua questão deve ter:
-- Título
-- Seção "Intro" com descrição detalhada dos atributos, construtor e métodos
-- Seção "Shell" com 5 casos de teste no formato entrada/saída dos exemplos acima
+# Input do usuario
 
-Não inclua gabarito. Apenas enunciado e testes.""",
-    expected_output='Enunciado completo com título, Intro e Shell com casos de teste.',
-    agent=designer_criativo
-)
+print("=== Gerador de Questões POO (Kotlin) ===\n")
+print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
+descricao = input(
+    "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
+).strip()
+tipo = input(f"Tipo da atividade {TIPOS_VALIDOS} (padrão TRAIN): ").strip().upper()
+if tipo not in TIPOS_VALIDOS:
+    tipo = "TRAIN"
+nome_questao = input("Nome da pasta de saída: ").strip().lower().replace(" ", "_") or "questao"
 
-tarefa_arquivos = Task(
-    description=f"""Com base na questão criada, gere o README.md e o tests.toml.
+print("\nAnalisando tópicos e carregando exemplos do repositório...")
+topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
+# Para fixar os tópicos manualmente (sem detecção automática), use:
+# topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
+#                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
 
-REGRAS CRÍTICAS PARA O tests.toml:
-- O input NUNCA contém código Java. São apenas comandos de texto simples como "addCli maria 500"
-- Cada linha do input é um comando seguido de parâmetros separados por espaço
-- O output espelha cada comando com $ na frente, seguido do resultado esperado
-- Todo caso de teste termina com o comando "end"
+topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos)
+contexto_usuario = descricao
+entrada_usuario = descricao
 
-O formato OBRIGATÓRIO é exatamente este, sem exceções:
+confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
+if confirma == "n":
+    raise SystemExit(0)
 
-[[tests]]
-input = '''
-addItem cadeira 100.0 40 30
-addItem mesa 200.0 80 40
-show
-end
-'''
-output = '''
-$addItem cadeira 100.0 40 30
-$addItem mesa 200.0 80 40
-$show
-cadeira 100.0 40 30
-mesa 200.0 80 40
-$end
-'''
 
-PROIBIDO no input:
-- Código Java (new, =, (, ), ;)
-- Nomes de classes
-- Declarações de variáveis
+# ─── formatos e regras (constantes raw: têm {}, $ e \\ que quebrariam f-strings) ──────
 
-REGRAS PARA O README.md:
-- O enunciado deve ter uma HISTÓRIA criativa e envolvente relacionada ao contexto "{contexto_usuario}"
-  como se fosse um cenário real do mercado de trabalho, apresentando personagens, um problema
-  concreto e por que o sistema precisa ser construído
-- A seção Intro deve descrever os atributos, construtor e métodos esperados
-- A seção Shell deve conter os 3 PRIMEIROS casos de teste do TOML, no mesmo formato
-  (blocos ```bash com #TEST_CASE nome, os comandos e saídas esperadas)
-- Exemplo de como apresentar um teste na seção Shell do README:
+FORMATO_README = r"""---
+index_content: |2
+    - Descrição: (uma frase)
+    - Domínio: (uma frase)
+    - Objetivos: (uma frase)
+---
+# [TIPO] Título da questão
+
+<!-- toc-table -->
+
+![_](assets/cover.webp)
+
+## Intro
+
+(história criativa + descrição dos atributos, construtor e métodos)
+
+## Regras
+
+- (uma regra por linha)
+
+## Diagrama
+
+```mermaid
+%%{init: { "fontFamily": "monospace" } }%%
+classDiagram
+    direction TB
+
+    class Slipper {
+        +MIN_SIZE : Int$
+        -size : Int
+        +getSize() Int
+        +setSize(size : Int) Boolean
+    }
+
+    class Main {
+        +main() Unit
+    }
+
+    Main ..> Slipper : creates and uses
+```
+
+## Shell
 
 ```bash
 #TEST_CASE iniciando
 
-$addItem cadeira 100.0
+$init lion roar
 $show
-cadeira 100.0
+lion:0:roar
+$grow 1
+$noise
+roar
 $end
 ```
 
-Use EXATAMENTE estes marcadores:
+```bash
+#TEST_CASE morrendo
+
+$init cat meow
+$grow 4
+warning: animal is dead
+$noise
+RIP
+$end
+```
+
+<!-- MERMAID -->"""
+
+REGRAS_TESTES = r"""REGRAS DOS CASOS DE TESTE (blocos ```bash dentro de "## Shell"):
+- Cada caso começa com "#TEST_CASE nome_curto" (sem espaços no nome) seguido de uma linha em branco.
+- TODA linha de comando começa com "$" (sem exceção) e usa só argumentos de UMA palavra, sem aspas.
+- As linhas sem "$" são o que o programa imprime como resultado do comando logo acima.
+- O programa repete cada comando com "$" na frente, então a saída esperada inclui as linhas "$comando".
+- Todo caso termina com "$end".
+- No mínimo 5 casos, incluindo falhas, valores de fronteira, estado preservado e uma sequência de operações."""
+
+REGRAS_MAIN = r"""   - As mensagens do programa ficam em constantes no TOPO do arquivo, antes das classes, em inglês:
+       const val INVALID_COMMAND_MSG: String = "fail: invalid command"
+     (uma constante *_MSG para cada mensagem de falha ou aviso usada pela main).
+   - A main é a ÚLTIMA coisa do arquivo: 'fun main(): Unit'.
+   - O estado manipulado pelos comandos é declarado DENTRO da main, antes do loop, com valor neutro.
+     Exemplo: var currentAnimal: Animal = Animal("", "")   (coleções: val itens: MutableList<Item> = mutableListOf())
+   - Loop 'while (true)' com exatamente esta leitura:
+       val line: String = readLine() ?: break
+       println("$" + line)
+       val parts: List<String> = line.trim().split(Regex("\\s+"))
+   - 'when (parts[0])' com UM ramo por comando, em um destes formatos:
+       "end" -> break
+       "init" -> currentAnimal = Animal(parts[1], parts[2])                  (cria ou atribui)
+       "show" -> println(currentAnimal)                                       (mostra o objeto via toString)
+       "noise" -> println(currentAnimal.makeSound())                          (imprime o retorno do método)
+       "grow" -> if (!currentAnimal.grow(parts[1].toInt())) { println(DEAD_ANIMAL_MSG) }   (traduz Boolean/enum/null em mensagem)
+     Converta parâmetros direto em parts[i] com toInt()/toDouble().
+   - Ramo final: else -> println(INVALID_COMMAND_MSG)
+   - As classes NUNCA imprimem: só a main escreve na saída. Para exibir um objeto, a main faz println(obj)
+     e a classe implementa toString(); o formato do toString faz parte da saída esperada dos testes.
+   - Se houver exceções, a main usa try/catch por ramo e imprime a mensagem correspondente.
+   - O main DEVE tratar todos os comandos que os testes usam."""
+
+SHELL_ESQUELETO_EXEMPLO = r"""
+const val DEAD_ANIMAL_MSG: String = "warning: animal is dead"
+const val INVALID_COMMAND_MSG: String = "fail: invalid command"
+
+class Animal(private val species: String, private val noise: String) {
+    companion object {
+        const val DEAD_STAGE: Int = 4
+    }
+
+    private var lifeStage: Int = 0
+
+    fun makeSound(): String {
+        TODO("retorne o som conforme o estágio de vida")
+    }
+
+    fun grow(stages: Int): Boolean {
+        TODO("envelheça o animal; retorne false se já estiver morto ou se morrer agora")
+    }
+
+    override fun toString(): String {
+        TODO("retorne a representação textual do animal")
+    }
+}
+
+fun main(): Unit {
+    var currentAnimal: Animal = Animal("", "")
+
+    while (true) {
+        val line: String = readLine() ?: break
+        println("$" + line)
+
+        val parts: List<String> = line.trim().split(Regex("\\s+"))
+        when (parts[0]) {
+            "end" -> break
+            "init" -> currentAnimal = Animal(parts[1], parts[2])
+            "show" -> println(currentAnimal)
+            "noise" -> println(currentAnimal.makeSound())
+            "grow" -> if (!currentAnimal.grow(parts[1].toInt())) {
+                println(DEAD_ANIMAL_MSG)
+            }
+            else -> println(INVALID_COMMAND_MSG)
+        }
+    }
+}
+"""
+
+REGRAS_MENSAGENS = (
+    "As explicações do enunciado ficam em português, mas as MENSAGENS PRODUZIDAS PELO PROGRAMA "
+    "(ex.: 'fail: invalid size', 'fail: invalid command') ficam em inglês, e são escritas só na main."
+)
+
+ESTILO_KOTLIN = (
+    "ESTILO KOTLIN DO REPOSITÓRIO: tipos explícitos em tudo (val x: Int = 0), 'fun main(): Unit', "
+    "atributos 'private var' ou 'private val', métodos getX()/setX() escritos à mão, constantes em "
+    "'companion object' com 'const val', entrada com readLine() ?: break, conversões com toInt()/toDouble(). "
+    "Use apenas a biblioteca padrão do Kotlin (kotlin.*); Kotlin NÃO tem printf: use println com templates de string."
+)
+
+ESCOPO = (
+    "ESCOPO: implemente SOMENTE o que o pedido do professor e os tópicos pedem. Não invente recursos extras "
+    "que não foram pedidos."
+)
+
+
+# ─── tasks ──────────────────────────────────────────────────────
+
+tarefa_rascunho = Task(
+    description=f"""Crie uma questão de programação em Kotlin para o seguinte pedido do professor:
+"{entrada_usuario}"
+
+Tópicos que a questão DEVE aplicar: {topicos_txt}.
+{ESCOPO}
+
+{exemplos}
+
+Sua questão deve:
+- Aplicar cada tópico pedido do MESMO modo que nos exemplos acima (copie a forma de aplicar o conceito,
+  não o domínio dos exemplos);
+- Ter Título;
+- Ter Descrição, Domínio e Objetivos, uma frase cada (como no resumo do início dos exemplos);
+- Ter uma Intro com a história e a descrição das classes, atributos, construtor e métodos;
+- Ter uma lista de Regras;
+- Listar os COMANDOS do programa (nome, argumentos de uma palavra, e o que imprimem);
+- Ter 5 casos de teste (comandos e saída esperada).
+
+{REGRAS_MENSAGENS}
+
+Não inclua gabarito. Apenas enunciado e testes.""",
+    expected_output='Enunciado completo com título, descrição, domínio, objetivos, intro, regras, comandos e casos de teste.',
+    agent=designer_criativo
+)
+
+tarefa_arquivos = Task(
+    description=f"""Com base na questão criada, escreva o README.md COMPLETO, exatamente no formato do repositório.
+Tipo da atividade (use no título): [{tipo}]
+Contexto da história: "{contexto_usuario}"
+Tópicos aplicados: {topicos_txt}.
+
+FORMATO (siga a estrutura e os nomes das seções; troque o conteúdo entre parênteses):
+{FORMATO_README}
+
+{REGRAS_TESTES}
+
+REGRAS DO README:
+- A Intro deve ter uma HISTÓRIA criativa e envolvente relacionada ao contexto, como um cenário real de trabalho,
+  com personagens, um problema concreto e o motivo de o sistema ser construído; depois descreva as classes,
+  atributos, construtor, métodos, comandos e mensagens esperados.
+- O diagrama deve refletir as classes da questão, com os tipos de retorno corretos.
+- NÃO inclua a seção "## Guide": o esqueleto de código é inserido automaticamente.
+- {REGRAS_MENSAGENS}
+
+Use EXATAMENTE este marcador:
 
 <<<README>>>
-(README.md com título, história criativa na Intro, comandos disponíveis e seção Shell com os 3 primeiros testes)
-<<<END>>>
-
-<<<TOML>>>
-(tests.toml com TODOS os casos [[tests]] no formato correto)
+(README.md completo)
 <<<END>>>""",
-    expected_output='Dois blocos <<<README>>> e <<<TOML>>>, cada um fechado com <<<END>>>.',
+    expected_output='Um bloco <<<README>>> com o README.md completo, fechado com <<<END>>>.',
     agent=especialista_poo
 )
 
 tarefa_shell = Task(
-    description=f"""Com base na questão e nos testes gerados, crie o Shell.java.
+    description=f"""Com base na questão e nos testes gerados, crie o main.kt (em Kotlin).
+Tópicos aplicados na questão: {topicos_txt}.
+
+{ESTILO_KOTLIN}
 
 OBJETIVO: gerar um ESQUELETO para o aluno completar.
 
 REGRA PRINCIPAL — dois tipos de conteúdo no arquivo:
 
-1. CLASSES (totalmente vazias para o aluno implementar):
-   - Declare os atributos com o tipo correto, mas SEM inicializar valores.
-   - O construtor deve ter os parâmetros corretos, mas o corpo contém apenas:
-       // TODO: inicialize os atributos
-   - Cada método deve ter a assinatura correta e o tipo de retorno correto, mas o corpo contém apenas:
-       // TODO: implemente este método
-       return ""; // (ou return 0; ou return null; conforme o tipo)
-   - Herança (extends) e anotações (@Override) devem aparecer normalmente.
+1. CLASSES (para o aluno implementar):
+   - Declare os atributos com tipo explícito e valor neutro ("" / 0 / 0.0 / false / lista vazia), para o arquivo compilar.
+     Se o enunciado pede encapsulamento, use 'private'.
+   - Cada método deve ter a assinatura correta e o tipo de retorno correto, e o corpo contém APENAS:
+       TODO("descreva o que o método deve fazer")
+   - Se precisar inicializar no construtor, use um bloco init contendo apenas: // TODO: inicialize os atributos
+   - Use herança ('open class' / 'override'), enum class, MutableMap, exceções etc. SOMENTE se o enunciado exigir.
    - NÃO escreva nenhuma lógica real nas classes.
 
-2. MÉTODO main (completamente implementado):
-   - Loop while(true) com scanner.nextLine() e System.out.println("$" + line)
-   - split(" ") e var cmd = par[0]
-   - Um else-if por comando presente nos testes, com:
-       • Extração de parâmetros do array par[] com os tipos corretos (parseInt, parseDouble etc.)
-       • Instanciação correta da classe com new
-       • Chamada ao método correto (add em lista, println no resultado etc.)
-   - Bloco else com: System.out.println("fail: comando invalido\\n");
-   - Listas (ArrayList) declaradas como atributos estáticos da classe Shell, fora da main.
-   - NÃO deixe TODOs nem comentários na main — ela deve funcionar se o aluno implementar as classes.
+2. FUNÇÃO main (completamente implementada, SIGA ESTAS REGRAS EXATAMENTE):
+{REGRAS_MAIN}
 
-Siga o padrão deste exemplo (adapte classes e comandos ao contexto "{contexto_usuario}"):
+O exemplo abaixo serve APENAS para mostrar o FORMATO do arquivo (adapte classes e comandos ao contexto
+"{contexto_usuario}"; NÃO copie o domínio da questão animal):
 {SHELL_ESQUELETO_EXEMPLO}
 
 Use EXATAMENTE este marcador:
 
 <<<SHELL>>>
-(conteúdo completo do Shell.java)
+(conteúdo completo do main.kt)
 <<<END>>>""",
-    expected_output='Um bloco <<<SHELL>>> com o Shell.java completo fechado com <<<END>>>.',
+    expected_output='Um bloco <<<SHELL>>> com o main.kt completo (esqueleto) fechado com <<<END>>>.',
     agent=especialista_poo
 )
 
@@ -552,42 +591,47 @@ Use EXATAMENTE este marcador:
 
 def criar_tarefa_gabarito(readme: str, shell: str) -> Task:
     return Task(
-        description=f"""Você é o Auditor Técnico. Com base no enunciado (README) e no esqueleto (Shell.java)
-abaixo, implemente uma SOLUÇÃO DE REFERÊNCIA completa e funcional, preenchendo todos os TODOs
-com lógica correta.
+        description=f"""Você é o Auditor Técnico. Com base no enunciado (README) e no esqueleto (main.kt)
+abaixo, implemente uma SOLUÇÃO DE REFERÊNCIA completa e funcional em Kotlin, substituindo todos os
+TODO(...) e comentários TODO por lógica correta.
 
 --- README ---
 {readme}
 
---- SHELL.JAVA (ESQUELETO) ---
+--- MAIN.KT (ESQUELETO) ---
 {shell}
 
+{ESTILO_KOTLIN}
+
 REGRAS:
-- Mantenha a assinatura de todas as classes, atributos, construtores e métodos exatamente como
-  estão no esqueleto.
-- Implemente toda a lógica indicada pelos comentários TODO, de acordo com o que o README descreve.
-- Não altere o método main nem os comandos que ele reconhece.
-- O código deve compilar sem erros.
-- Não adicione texto explicativo fora do bloco de código.
+- Mantenha a assinatura de todas as classes, atributos, construtores e métodos exatamente como estão no esqueleto.
+- Implemente toda a lógica de acordo com o que o README descreve.
+- Não altere a função main nem os comandos que ela reconhece.
+- O código deve compilar sem erros com kotlinc.
+- Responda DIRETAMENTE com o marcador, sem raciocínio e sem texto fora do bloco.
 
-Use EXATAMENTE este marcador:
-
-IMPORTANTE: não envolva o código em blocos de código markdown (```). Escreva o Shell.java
-diretamente entre o marcador de abertura e <<<END>>>, sem cercas extras — o conteúdo vai direto
-para o compilador javac, então qualquer caractere fora do código Java quebra a compilação.
+IMPORTANTE: não envolva o código em blocos markdown (```). Escreva o main.kt diretamente entre o marcador
+de abertura e <<<END>>>: o conteúdo vai direto para o compilador. NÃO esqueça de fechar com <<<END>>>.
 
 <<<GABARITO>>>
-(Shell.java completo, com todas as classes implementadas)
+(main.kt completo, com todas as classes implementadas)
 <<<END>>>""",
-        expected_output='Um bloco <<<GABARITO>>> com o Shell.java totalmente implementado, fechado com <<<END>>>.',
+        expected_output='Um bloco <<<GABARITO>>> com o main.kt totalmente implementado, fechado com <<<END>>>.',
         agent=auditor_tecnico
     )
 
 
-def criar_tarefa_correcao(readme: str, toml: str, shell: str, diagnostico: str, contexto: str) -> Task:
+def criar_tarefa_correcao(readme: str, shell: str, diagnostico: str, contexto: str,
+                          exemplos_repo: str, topicos_txt: str) -> Task:
     return Task(
-        description=f"""A questão abaixo falhou na auditoria técnica automática. Corrija o README.md, o
-tests.toml e/ou o Shell.java para eliminar os problemas apontados no relatório de diagnóstico.
+        description=f"""A questão abaixo falhou na auditoria técnica automática. Corrija o README.md (incluindo os
+casos de teste) e/ou o main.kt (esqueleto) para eliminar os problemas apontados no relatório.
+
+Tópicos que a questão deve aplicar: {topicos_txt}.
+
+{ESTILO_KOTLIN}
+
+{exemplos_repo}
 
 --- RELATÓRIO DE DIAGNÓSTICO (compilação/execução real) ---
 {diagnostico}
@@ -595,40 +639,28 @@ tests.toml e/ou o Shell.java para eliminar os problemas apontados no relatório 
 --- README ATUAL ---
 {readme}
 
---- TESTS.TOML ATUAL ---
-{toml}
-
---- SHELL.JAVA ATUAL (ESQUELETO) ---
+--- MAIN.KT ATUAL (ESQUELETO) ---
 {shell}
 
 INSTRUÇÕES:
-- Identifique a causa raiz: pode ser um esqueleto mal especificado (assinatura, tipo de retorno),
-  um caso de teste com entrada/saída incorreta, ou uma inconsistência entre o enunciado e os
-  comandos aceitos pelo Shell.
-- Corrija apenas o necessário para eliminar a divergência relatada, sem descaracterizar a questão.
-- Preserve o contexto "{contexto}" e o nível de dificuldade original.
-- O tests.toml deve continuar seguindo o formato input/output com comandos de texto simples
-  (nunca código Java), com parâmetros separados por espaço, e terminar cada input com "end".
-- O Shell.java entregue aqui continua sendo um ESQUELETO (com TODOs) — não inclua a lógica de
-  solução nele, apenas corrija assinaturas/estrutura se for essa a causa da falha.
+- Identifique a causa raiz: esqueleto mal especificado (assinatura, tipo de retorno, main fora do padrão),
+  caso de teste com comando ou saída incorreta, ou inconsistência entre enunciado e comandos do main.
+- Corrija apenas o necessário, sem descaracterizar a questão. Preserve o pedido original: "{contexto}"
+- O README continua no formato do repositório (front matter, Intro, Regras, Diagrama, Shell) e SEM a seção "## Guide".
+{REGRAS_TESTES}
+- O main.kt entregue continua sendo um ESQUELETO: métodos só com TODO("..."), e a main completa:
+{REGRAS_MAIN}
 
-Use EXATAMENTE estes marcadores:
-
-IMPORTANTE: não envolva nenhum dos três blocos em cercas de código markdown (```). Escreva cada
-conteúdo diretamente entre seu marcador de abertura e <<<END>>>.
+Use EXATAMENTE estes marcadores (sem cercas markdown em volta dos blocos):
 
 <<<README>>>
-(README.md corrigido)
-<<<END>>>
-
-<<<TOML>>>
-(tests.toml corrigido)
+(README.md completo corrigido)
 <<<END>>>
 
 <<<SHELL>>>
-(Shell.java corrigido, ainda como esqueleto com TODOs)
+(main.kt corrigido, ainda como esqueleto com TODO)
 <<<END>>>""",
-        expected_output='Três blocos <<<README>>>, <<<TOML>>> e <<<SHELL>>>, cada um fechado com <<<END>>>.',
+        expected_output='Dois blocos <<<README>>> e <<<SHELL>>>, cada um fechado com <<<END>>>.',
         agent=especialista_poo
     )
 
@@ -641,30 +673,27 @@ equipe = Crew(
     process=Process.sequential
 )
 
-print("Gerando questão...\n")
+print("\nGerando questão...\n")
 if not kickoff_seguro(equipe, "geração do rascunho inicial"):
     raise SystemExit(1)
 
-saidas = [str(t.output) for t in equipe.tasks if t.output]
-tudo = "\n".join(saidas)
+saida_arquivos = str(tarefa_arquivos.output) if tarefa_arquivos.output else ""
+saida_shell    = str(tarefa_shell.output) if tarefa_shell.output else ""
 
-readme_atual = extrair_bloco(tudo, "README")
-toml_atual   = extrair_bloco(tudo, "TOML")
-shell_atual  = extrair_bloco(tudo, "SHELL")
+readme_atual = extrair_bloco(saida_arquivos, "README")
+shell_atual  = extrair_codigo(saida_shell, "SHELL")
 
-if not (readme_atual and toml_atual and shell_atual):
-    faltando = [n for n, v in [("README", readme_atual), ("TOML", toml_atual), ("SHELL", shell_atual)] if not v]
-    print(f"\nBlocos não encontrados: {faltando}")
-    print("\nSaída bruta:\n")
-    print(tudo)
+if not (readme_atual and shell_atual and extrair_testes_readme(readme_atual)):
+    print("\nFaltou algum bloco (README, SHELL) ou o README não tem casos de teste válidos.")
+    print("\n--- Saída bruta (README) ---\n" + saida_arquivos)
+    print("\n--- Saída bruta (SHELL) ---\n" + saida_shell)
     raise SystemExit(1)
 
 
 # ─── ciclo de auditoria e correção ───────────────────────────────────────────
-# a cada tentativa: gera um gabarito, compila e executa contra o tests.toml atual.
+# a cada tentativa: gera a solução a partir do esqueleto, compila e executa contra os testes do README.
 # se falhar, manda o diagnóstico pro especialista_poo corrigir, e tenta de novo.
 
-MAX_TENTATIVAS = 3
 aprovado = False
 gabarito_atual = ""
 diagnostico = ""
@@ -672,26 +701,41 @@ diagnostico = ""
 for tentativa in range(1, MAX_TENTATIVAS + 1):
     print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
 
-    tarefa_gabarito = criar_tarefa_gabarito(readme_atual, shell_atual)
-    crew_auditoria = Crew(agents=[auditor_tecnico], tasks=[tarefa_gabarito], process=Process.sequential)
-    if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
-        diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
-        break
-
-    gabarito_atual = extrair_bloco(str(tarefa_gabarito.output), "GABARITO")
-
-    if not gabarito_atual:
-        print("Auditor não retornou um bloco <<<GABARITO>>> válido.")
-        diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+    if "TODO" not in shell_atual:
+        # o esqueleto veio com a lógica pronta: não há nada para o aluno implementar
+        diagnostico = ("O main.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
+                       "apenas TODO(\"...\") no corpo; só a função main fica completa.")
+        gabarito_atual = ""
     else:
-        print("Compilando e executando o gabarito contra os casos de tests.toml...")
-        resultado = compilar_e_executar(gabarito_atual, toml_atual)
-        diagnostico = formatar_relatorio(resultado)
-
-        if resultado["sucesso"]:
-            print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
-            aprovado = True
+        crew_auditoria = Crew(agents=[auditor_tecnico],
+                              tasks=[criar_tarefa_gabarito(readme_atual, shell_atual)],
+                              process=Process.sequential)
+        tarefa_gabarito = crew_auditoria.tasks[0]
+        if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
+            diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
             break
+
+        saida_auditor = str(tarefa_gabarito.output) if tarefa_gabarito.output else ""
+        gabarito_atual = extrair_codigo(saida_auditor, "GABARITO")
+
+        if not gabarito_atual:
+            print("Auditor não retornou um bloco <<<GABARITO>>> válido. Início da resposta recebida:")
+            print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
+            diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+        else:
+            print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
+            resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
+            diagnostico = formatar_relatorio(resultado)
+
+            if resultado["etapa"] == "ambiente":
+                print(f"⚠ {resultado['detalhe']}")
+                print("Auditoria automática indisponível; salvando a questão sem validação.")
+                break
+
+            if resultado["sucesso"]:
+                print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
+                aprovado = True
+                break
 
     print(f"✗ Falhas detectadas:\n{diagnostico}")
 
@@ -700,18 +744,18 @@ for tentativa in range(1, MAX_TENTATIVAS + 1):
         break
 
     print("Enviando relatório de diagnóstico ao Especialista para correção...")
-    tarefa_correcao = criar_tarefa_correcao(readme_atual, toml_atual, shell_atual, diagnostico, contexto_usuario)
+    tarefa_correcao = criar_tarefa_correcao(readme_atual, shell_atual, diagnostico,
+                                            contexto_usuario, exemplos, topicos_txt)
     crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
     if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
         break
 
-    saida_correcao = str(tarefa_correcao.output)
+    saida_correcao = str(tarefa_correcao.output) if tarefa_correcao.output else ""
     novo_readme = extrair_bloco(saida_correcao, "README")
-    novo_toml   = extrair_bloco(saida_correcao, "TOML")
-    novo_shell  = extrair_bloco(saida_correcao, "SHELL")
+    novo_shell  = extrair_codigo(saida_correcao, "SHELL")
 
-    if novo_readme and novo_toml and novo_shell:
-        readme_atual, toml_atual, shell_atual = novo_readme, novo_toml, novo_shell
+    if novo_readme and novo_shell and extrair_testes_readme(novo_readme):
+        readme_atual, shell_atual = novo_readme, novo_shell
     else:
         print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
 
@@ -725,15 +769,7 @@ status = (
 )
 print(f"\nStatus final da questão: {status}")
 
-salvar_arquivos(OUTPUT_DIR, nome_questao, readme_atual, toml_atual, shell_atual)
-print("✓ README.md")
-print("✓ tests.toml")
-print("✓ Shell.java")
-
-if gabarito_atual:
-    solucao_path = Path(OUTPUT_DIR) / nome_questao / "Solucao.java"
-    solucao_path.write_text(gabarito_atual, encoding="utf-8")
-    print(f"✓ Solução do auditor salva em: {solucao_path}")
+salvar_questao(OUTPUT_DIR, nome_questao, inserir_guia(readme_atual, shell_atual), gabarito_atual)
 
 if not aprovado:
     log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
