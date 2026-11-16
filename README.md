@@ -1,146 +1,171 @@
 # Forja
 
-Gerador de questões de POO para o repositório arcade.
+Gerador de questões de Programação Orientada a Objetos (POO) em Kotlin para o repositório arcade.
 
-Você passa um contexto (cassino, aeroporto, biblioteca), um nível(fácil, médio ou difícil) e um tema de POO(herança, polimorfismo, encapsulamento ...), e ele gera os 3 arquivos da questão prontos: README.md, tests.toml e Shell.java, no mesmo formato das questões do repositório (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
+Você informa uma descrição em linguagem natural da questão desejada (contexto, classes, comportamentos e tópicos de POO), seleciona o tipo da atividade e define o nome da pasta de saída. O sistema analisa o pedido, busca padrões e exemplos em um repositório arcade de referência e gera a estrutura completa da questão: README.md (com enunciado, regras, diagrama Mermaid, guia de implementação e casos de teste embutidos), src/kt/main.kt (esqueleto em Kotlin com TODOs para o estudante) e a pasta assets/ para a imagem de capa.
+
+O projeto segue as convenções do repositório arcade (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
 
 ---
 
 ## Como funciona
 
-Três agentes rodam em sequência via CrewAI:
+O processo utiliza três agentes coordenados via CrewAI, com um ciclo integrado de auditoria técnica e autocorreção:
 
-1. O Designer Instrucional cria o rascunho da questão com história, enunciado e casos de teste
-2. O Especialista POO gera o README.md e o tests.toml no formato correto
-3. O mesmo Especialista gera o Shell.java com o esqueleto para o aluno completar
+1. Designer Instrucional de TI: analisa a descrição do usuário e os tópicos de POO detectados, gerando um rascunho com a história, regras de negócio, comandos aceitos e casos de teste.
+2. Especialista em POO Kotlin: transforma o rascunho no README.md padronizado e cria o esqueleto do arquivo main.kt, com classes estruturadas (métodos com TODO) e a função main completa para interpretação dos comandos via terminal.
+3. Auditor Técnico de Qualidade: implementa uma solução funcional completa a partir do esqueleto e do enunciado. O sistema compila o código com kotlinc e executa a solução contra todos os casos de teste do README.md.
 
-Os agentes usam LLaMA 3.3 70B via Groq. Dá pra trocar pra Ollama e rodar local se quiser.
+Se a auditoria detectar divergências de saída, erros de compilação ou falhas de execução, um diagnóstico detalhado é gerado e repassado ao Especialista para correção do README e do esqueleto. Esse ciclo se repete por até 3 tentativas.
+
+Ao final:
+- Se aprovada: a questão é salva na pasta de saída com README.md, src/kt/main.kt e assets/.
+- Se não for validada após o limite de tentativas: os arquivos são salvos acompanhados de um diagnostico_final.txt detalhando o problema para revisão manual.
+
+Os agentes utilizam modelos Gemini (gemini-3.5-flash-lite para rascunho e auditoria, e gemini-3.8-flash para geração e revisão) via LiteLLM.
+
+---
+
+## Tópicos de POO suportados
+
+O módulo topicos_poo.py identifica automaticamente os tópicos necessários com base na sua descrição, ou permite configurá-los manualmente:
+
+- Classes e Objetos
+- Encapsulamento e Invariantes
+- Agregação e Delegação
+- Desafios de agregação e estados
+- Coleções lineares
+- Posições fixas e ausência
+- Exceções
+- Mapas
+- Índices e Redundância
+- Polimorfismo
+
+O sistema consulta exemplos reais das questões presentes na pasta base do repositório arcade e utiliza os padrões catalogados em padroes.json para garantir conformidade técnica com o estilo do repositório (classes de domínio puras sem prints, mensagens em inglês na função main, comandos prefixados com cifrão nos testes, tipos explícitos).
+
+---
+
+## Requisitos
+
+- Python 3.12+
+- Gerenciador de pacotes uv (recomendado) ou pip
+- Java JDK 17+ (comandos javac e java no PATH)
+- Compilador Kotlin CLI (comando kotlinc no PATH, necessário para a validação do auditor)
+
+No Arch Linux:
+
+```bash
+sudo pacman -S jdk-openjdk kotlin
+```
+
+No Ubuntu / Debian:
+
+```bash
+sudo apt update
+sudo apt install default-jdk
+```
+
+Para instalar o kotlinc via SDKMAN:
+
+```bash
+sdk install kotlin
+```
 
 ---
 
 ## Instalação
 
-Clone o repositório e entre na pasta:
+Clone o repositório e acesse a pasta:
 
 ```bash
-git clone https://github.com/seu-usuario/forja.git
-cd forja
+git clone https://github.com/marquinvitor/Forja.git
+cd Forja
 ```
 
-Instale as dependências:
+### Opção 1: Usando uv (Recomendado)
+
+Se tiver o uv instalado, sincronize as dependências diretamente:
 
 ```bash
+uv sync
+```
+
+### Opção 2: Usando venv e pip
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install crewai litellm python-dotenv
 ```
 
-Crie o .env:
+### Configuração de variáveis de ambiente
+
+Copie o arquivo de exemplo e crie o seu .env:
 
 ```bash
 cp .env.example .env
 ```
 
-Preencha com seus valores: \
-GROQ_API_KEY=sua_chave_aqui \
-CAMINHO_REPO=/home/seu-usuario/arcade/base \
-OUTPUT_DIR=/home/seu-usuario/QuestionCreate/output
+Edite o arquivo .env com suas configurações:
 
-A key do groq é gratuita em console.groq.com/keys
+```ini
+GEMINI_API_KEY=sua_chave_gemini_aqui
+CAMINHO_REPO=/home/seu-usuario/arcade/base
+OUTPUT_DIR=/home/seu-usuario/Forja/output
+```
+
+A chave da API Gemini pode ser gerada gratuitamente no Google AI Studio (https://aistudio.google.com).
+O CAMINHO_REPO deve apontar para o diretório base do repositório arcade clonado localmente.
+O OUTPUT_DIR é a pasta onde as novas questões serão criadas.
 
 ---
 
 ## Uso
 
+Execute o script principal:
+
+Com uv:
+
 ```bash
-python Main.py
+uv run Forja.py
 ```
 
-O sistema pede 3 coisas:
+Com venv ativo:
 
-Contexto da questão (ex: concessionaria, aeroporto, biblioteca) - EX: maratona  
-Nível (Fácil / Médio / Difícil) - EX: Difícil  
-Tema POO (ex: Herança e Interfaces, Polimorfismo, Encapsulamento) - EX: Herança
+```bash
+python Forja.py
+```
 
-Os arquivos são salvos em output/maratona/.
+O terminal solicitará:
+
+1. Descrição da questão: texto livre descrevendo tema, regras e classes desejadas.
+   Exemplo: 3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca
+2. Tipo da atividade: GUIDE, TRAIN, ALONE ou CHECK (padrão: TRAIN).
+3. Nome da pasta de saída: nome da pasta que será criada dentro de OUTPUT_DIR (exemplo: biblioteca_magica).
+
+O sistema identificará os tópicos de POO correspondentes e solicitará confirmação antes de disparar os agentes.
 
 ---
 
-## Validador de questões
+## Estrutura dos arquivos gerados
 
-O projeto também possui um validador automático para conferir os artefatos gerados em `output/`.
+Cada questão gerada é salva em uma pasta própria dentro de output/ com a seguinte organização:
 
-Ele percorre as pastas das questões, lê os arquivos `tests.toml`, compila os `Shell.java` e executa os casos de teste para verificar se o esqueleto processa as entradas sem crash.
-
-Para rodar a validação:
-
-```bash
-python validar_questoes.py output
 ```
-
-Para gerar um relatório em JSON:
-
-```bash
-python validar_questoes.py output --relatorio relatorio_validacao.json
-```
-
-O relatório mostra quantas questões foram analisadas, quantos arquivos `tests.toml` estão válidos, quantos `Shell.java` compilaram e quantas execuções terminaram sem erro.
-
-Exemplo de saída:
-
-```bash
-RQ2: tests.toml lidos sem erro de parsing: 9/9
-RQ2: tests.toml com estrutura válida:       9/9
-RQ3: Shell.java compilados com sucesso:    9/9
-RQ3: Questões executadas sem crash:        4/9
-Execuções sem crash:                       25/47
-```
-
-O validador não confere se a saída lógica da questão está correta. Ele serve para verificar a conformidade técnica dos arquivos gerados: estrutura do `tests.toml`, compilação do `Shell.java` e execução sem exceções.
-
-Para usar o validador é necessário ter o Java instalado, com os comandos `javac` e `java` disponíveis no terminal.
-
-No Arch Linux:
-
-```bash
-sudo pacman -S jdk-openjdk
-```
-
-No Ubuntu/Debian:
-
-```bash
-sudo apt install default-jdk
+output/nome_da_questao/
+├── README.md              # Enunciado, regras, diagrama Mermaid, guide e testes no formato #TEST_CASE
+├── src/
+│   └── kt/
+│       └── main.kt        # Esqueleto da solução em Kotlin ou código validado pelo auditor
+├── assets/                # Diretório reservado para a imagem de capa (cover.webp)
+└── diagnostico_final.txt  # Gerado apenas se a questão não passar em todas as validações
 ```
 
 ---
 
-## Rodando local com Ollama
+## Estrutura do projeto
 
-Se não quiser depender do Groq, instale o Ollama:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.1:8b
-```
-
-Troque os LLMs no código:
-
-```python
-llm_rascunho = LLM(
-    model="ollama/llama3.1:8b",
-    base_url="http://localhost:11434",
-    temperature=0.5,
-    max_tokens=1500
-)
-```
-
-Rodando local não tem limite de requisição. O ollama8b é Recomendado se sua GPU tem 8GB+ de VRAM.
-(Fique livre pra tentar com outros modelos :) )
-
----
-
-## Dependências
-
-- Python 3.10+
-- Java JDK 17+
-- crewai 0.80+
-- litellm 1.0+
-- python-dotenv 1.0+
+- Forja.py: ponto de entrada da aplicação, orquestração dos agentes CrewAI, tarefas, integração com LiteLLM e ciclo de auditoria com compilação kotlinc e execução java.
+- topicos_poo.py: regras de detecção de tópicos de POO, extração de código e leitura de padrões do repositório arcade local.
+- padroes.json: catálogo de boas práticas e convenções observadas em cada tópico de POO.
+- pyproject.toml e uv.lock: definição e travamento determinístico de dependências do projeto.

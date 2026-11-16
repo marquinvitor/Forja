@@ -1,7 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Ambientes virtuais
 .venv/
 venv/
-.env/
+ENV/
+env/
+
+# Variaveis de ambiente
 .env
-.__pycache__
-__pycache__
-.__pycache__
+.env.local
+.env.*.local
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CrewAI
+.crewai/
+
+# Artefatos de compilacao Kotlin / Java
+*.class
+*.jar
+
+# Metadados do Windows / WSL
+*Zone.Identifier*
