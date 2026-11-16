@@ -2,9 +2,9 @@
 
 Gerador de questões de Programação Orientada a Objetos (POO) em Kotlin para o repositório arcade.
 
-Você informa uma descrição em linguagem natural da questão desejada (contexto, classes, comportamentos e tópicos de POO), seleciona o tipo da atividade e define o nome da pasta de saída. O sistema analisa o pedido, busca padrões e exemplos em um repositório arcade de referência e gera a estrutura completa da questão: README.md (com enunciado, regras, diagrama Mermaid, guia de implementação e casos de teste embutidos), src/kt/main.kt (esqueleto em Kotlin com TODOs para o estudante) e a pasta assets/ para a imagem de capa.
+Você informa uma descrição em linguagem natural da questão desejada (contexto, classes, comportamentos e tópicos de POO) e define o nome da pasta de saída. O sistema analisa o pedido, busca padrões e exemplos em um repositório arcade de referência e gera a estrutura completa da questão: README.md (com enunciado, regras, diagrama Mermaid, guia de implementação e casos de teste embutidos), src/kt/main.kt (questão totalmente resolvida e validada pelo auditor), src/kt/shell.kt (esqueleto em Kotlin com TODOs para o estudante completar) e a pasta assets/ para a imagem de capa.
 
-O projeto segue as convenções do repositório arcade (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
+Todas as atividades são geradas no formato padrão [TRAIN], seguindo rigorosamente as convenções do repositório arcade (https://github.com/qxcodepoo/arcade.git) do professor David Sena Oliveira.
 
 ---
 
@@ -13,13 +13,13 @@ O projeto segue as convenções do repositório arcade (https://github.com/qxcod
 O processo utiliza três agentes coordenados via CrewAI, com um ciclo integrado de auditoria técnica e autocorreção:
 
 1. Designer Instrucional de TI: analisa a descrição do usuário e os tópicos de POO detectados, gerando um rascunho com a história, regras de negócio, comandos aceitos e casos de teste.
-2. Especialista em POO Kotlin: transforma o rascunho no README.md padronizado e cria o esqueleto do arquivo main.kt, com classes estruturadas (métodos com TODO) e a função main completa para interpretação dos comandos via terminal.
-3. Auditor Técnico de Qualidade: implementa uma solução funcional completa a partir do esqueleto e do enunciado. O sistema compila o código com kotlinc e executa a solução contra todos os casos de teste do README.md.
+2. Especialista em POO Kotlin: transforma o rascunho no README.md padronizado e cria o esqueleto do arquivo shell.kt, com classes estruturadas (métodos com TODO) e a função main completa para interpretação dos comandos via terminal.
+3. Auditor Técnico de Qualidade: implementa a solução funcional completa a partir do esqueleto e do enunciado. O sistema compila o código com kotlinc e executa a solução contra todos os casos de teste do README.md.
 
 Se a auditoria detectar divergências de saída, erros de compilação ou falhas de execução, um diagnóstico detalhado é gerado e repassado ao Especialista para correção do README e do esqueleto. Esse ciclo se repete por até 3 tentativas.
 
 Ao final:
-- Se aprovada: a questão é salva na pasta de saída com README.md, src/kt/main.kt e assets/.
+- Se aprovada: a questão é salva na pasta de saída contendo o README.md, src/kt/main.kt (solução completa resolvida), src/kt/shell.kt (esqueleto para o estudante) e assets/.
 - Se não for validada após o limite de tentativas: os arquivos são salvos acompanhados de um diagnostico_final.txt detalhando o problema para revisão manual.
 
 Os agentes utilizam modelos Gemini (gemini-3.5-flash-lite para rascunho e auditoria, e gemini-3.8-flash para geração e revisão) via LiteLLM.
@@ -140,10 +140,9 @@ O terminal solicitará:
 
 1. Descrição da questão: texto livre descrevendo tema, regras e classes desejadas.
    Exemplo: 3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca
-2. Tipo da atividade: GUIDE, TRAIN, ALONE ou CHECK (padrão: TRAIN).
-3. Nome da pasta de saída: nome da pasta que será criada dentro de OUTPUT_DIR (exemplo: biblioteca_magica).
+2. Nome da pasta de saída: nome da pasta que será criada dentro de OUTPUT_DIR (exemplo: biblioteca_magica).
 
-O sistema identificará os tópicos de POO correspondentes e solicitará confirmação antes de disparar os agentes.
+Todas as atividades são geradas automaticamente como [TRAIN]. O sistema identificará os tópicos de POO correspondentes e solicitará confirmação antes de disparar os agentes.
 
 ---
 
@@ -156,7 +155,8 @@ output/nome_da_questao/
 ├── README.md              # Enunciado, regras, diagrama Mermaid, guide e testes no formato #TEST_CASE
 ├── src/
 │   └── kt/
-│       └── main.kt        # Esqueleto da solução em Kotlin ou código validado pelo auditor
+│       ├── main.kt        # Questão totalmente resolvida (solução validada pelo auditor)
+│       └── shell.kt       # Esqueleto para o estudante completar (classes com TODO e main implementada)
 ├── assets/                # Diretório reservado para a imagem de capa (cover.webp)
 └── diagnostico_final.txt  # Gerado apenas se a questão não passar em todas as validações
 ```
@@ -165,7 +165,7 @@ output/nome_da_questao/
 
 ## Estrutura do projeto
 
-- Forja.py: ponto de entrada da aplicação, orquestração dos agentes CrewAI, tarefas, integração com LiteLLM e ciclo de auditoria com compilação kotlinc e execução java.
+- Forja.py: ponto de entrada da aplicação, orquestração dos agentes CrewAI, tarefas, integração com LiteLLM, salvamento do esqueleto (shell.kt) e da solução (main.kt), e ciclo de auditoria com compilação kotlinc e execução java.
 - topicos_poo.py: regras de detecção de tópicos de POO, extração de código e leitura de padrões do repositório arcade local.
 - padroes.json: catálogo de boas práticas e convenções observadas em cada tópico de POO.
 - pyproject.toml e uv.lock: definição e travamento determinístico de dependências do projeto.

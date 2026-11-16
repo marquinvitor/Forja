@@ -16,7 +16,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CAMINHO_REPO   = os.getenv("CAMINHO_REPO", os.path.expanduser("~/arcade/base"))
 OUTPUT_DIR     = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/output"))
 
-TIPOS_VALIDOS  = ["GUIDE", "TRAIN", "ALONE", "CHECK"]
+TIPO_ATIVIDADE = "TRAIN"
 MAX_TENTATIVAS = 3
 
 if not GEMINI_API_KEY:
@@ -115,16 +115,19 @@ def extrair_testes_readme(readme: str) -> list[dict]:
     blocos = re.findall(r"```bash[ \t]*\n(.*?)```", readme, re.DOTALL)
     return parsear_casos("\n".join(blocos))
 
-def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str):
+def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esqueleto: str = ""):
     pasta = Path(output_dir) / nome
     (pasta / "assets").mkdir(parents=True, exist_ok=True)
     (pasta / "src" / "kt").mkdir(parents=True, exist_ok=True)
     (pasta / "README.md").write_text(readme, encoding="utf-8")
     if solucao:
         (pasta / "src" / "kt" / "main.kt").write_text(solucao, encoding="utf-8")
+    if esqueleto:
+        (pasta / "src" / "kt" / "shell.kt").write_text(esqueleto, encoding="utf-8")
     print(f"\nQuestão salva em: {pasta}")
-    print("✓ README.md (enunciado, esqueleto e testes)")
-    print("✓ src/kt/main.kt (solução do auditor)" if solucao else "⚠ Sem solução para salvar em src/kt/")
+    print("✓ README.md (enunciado e testes)")
+    print("✓ src/kt/main.kt (solução completa resolvida)" if solucao else "⚠ Sem solução para salvar em src/kt/main.kt")
+    print("✓ src/kt/shell.kt (esqueleto com TODOs para o estudante)" if esqueleto else "⚠ Sem esqueleto para salvar em src/kt/shell.kt")
     print("⚠ Falta adicionar a capa: assets/cover.webp")
 
 
@@ -299,9 +302,7 @@ print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
 descricao = input(
     "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
 ).strip()
-tipo = input(f"Tipo da atividade {TIPOS_VALIDOS} (padrão TRAIN): ").strip().upper()
-if tipo not in TIPOS_VALIDOS:
-    tipo = "TRAIN"
+tipo = TIPO_ATIVIDADE
 nome_questao = input("Nome da pasta de saída: ").strip().lower().replace(" ", "_") or "questao"
 
 print("\nAnalisando tópicos e carregando exemplos do repositório...")
@@ -767,7 +768,7 @@ status = (
 )
 print(f"\nStatus final da questão: {status}")
 
-salvar_questao(OUTPUT_DIR, nome_questao, readme_atual,gabarito_atual)
+salvar_questao(OUTPUT_DIR, nome_questao, readme_atual, gabarito_atual, shell_atual)
 
 if not aprovado:
     log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
