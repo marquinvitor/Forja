@@ -149,7 +149,7 @@ def _limpar_readme(texto: str) -> str:
 
 def ler_exemplo(pasta: Path, limite_readme: int = 2200, limite_codigo: int = 1200) -> str:
     """Formato atual da questão:
-         <questao>/README.md          (front matter, Intro, Regras, Guide com esqueleto, testes)
+         <questao>/README.md          (front matter, Intro, Regras, Guide, testes)
          <questao>/assets/            (capa; ignorada)
          <questao>/src/<lang>/...     (solução de referência)
        Compatível também com o formato antigo (tests.toml solto na pasta)."""

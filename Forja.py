@@ -115,17 +115,6 @@ def extrair_testes_readme(readme: str) -> list[dict]:
     blocos = re.findall(r"```bash[ \t]*\n(.*?)```", readme, re.DOTALL)
     return parsear_casos("\n".join(blocos))
 
-
-def inserir_guia(readme: str, esqueleto: str) -> str:
-    """Coloca o esqueleto numa seção '## Guide' logo antes de '## Shell' (formato do repositório)."""
-    if "## Guide" in readme:
-        return readme
-    guia = f"## Guide\n\n```kotlin\n{esqueleto.strip()}\n```\n\n"
-    if "## Shell" in readme:
-        return readme.replace("## Shell", guia + "## Shell", 1)
-    return readme.rstrip() + "\n\n" + guia
-
-
 def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str):
     pasta = Path(output_dir) / nome
     (pasta / "assets").mkdir(parents=True, exist_ok=True)
@@ -372,6 +361,14 @@ classDiagram
 
     Main ..> Slipper : creates and uses
 ```
+## Guide
+
+* (passo 1: o que implementar primeiro e o cuidado principal)
+* (passo 2)
+* (passo 3)
+* (passo 4)
+
+Perguntas de reflexão: (uma ou mais perguntas sobre decisões de design da questão)?
 
 ## Shell
 
@@ -515,6 +512,8 @@ Sua questão deve:
 - Ter uma lista de Regras;
 - Listar os COMANDOS do programa (nome, argumentos de uma palavra, e o que imprimem);
 - Ter 5 casos de teste (comandos e saída esperada).
+- Sugerir uma ordem de implementação em partes (o que fazer primeiro, depois e por último) e uma ou mais perguntas
+  de reflexão sobre decisões de design, que servirão de base para a seção Guide;
 
 {REGRAS_MENSAGENS}
 
@@ -539,8 +538,7 @@ REGRAS DO README:
   com personagens, um problema concreto e o motivo de o sistema ser construído; depois descreva as classes,
   atributos, construtor, métodos, comandos e mensagens esperados.
 - O diagrama deve refletir as classes da questão, com os tipos de retorno corretos.
-- NÃO inclua a seção "## Guide": o esqueleto de código é inserido automaticamente.
-- {REGRAS_MENSAGENS}
+- Inclua a seção "## Guide" com instruções de implementação passo a passo e perguntas de reflexão.
 
 Use EXATAMENTE este marcador:
 
@@ -646,7 +644,7 @@ INSTRUÇÕES:
 - Identifique a causa raiz: esqueleto mal especificado (assinatura, tipo de retorno, main fora do padrão),
   caso de teste com comando ou saída incorreta, ou inconsistência entre enunciado e comandos do main.
 - Corrija apenas o necessário, sem descaracterizar a questão. Preserve o pedido original: "{contexto}"
-- O README continua no formato do repositório (front matter, Intro, Regras, Diagrama, Shell) e SEM a seção "## Guide".
+- O README continua no formato do repositório (front matter, Intro, Regras, Diagrama,Guide, Shell).
 {REGRAS_TESTES}
 - O main.kt entregue continua sendo um ESQUELETO: métodos só com TODO("..."), e a main completa:
 {REGRAS_MAIN}
@@ -769,7 +767,7 @@ status = (
 )
 print(f"\nStatus final da questão: {status}")
 
-salvar_questao(OUTPUT_DIR, nome_questao, inserir_guia(readme_atual, shell_atual), gabarito_atual)
+salvar_questao(OUTPUT_DIR, nome_questao, readme_atual,gabarito_atual)
 
 if not aprovado:
     log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
