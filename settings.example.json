@@ -1,0 +1,13 @@
+{
+  "llm_provider": "gemini",
+  "gemini_api_key": null,
+  "gemini_api_key_file": "~/.gemini_key.txt",
+  "openai_api_key": null,
+  "openai_api_key_file": "~/.gpt_key.txt",
+  "openai_image_model": "gpt-image-2.5-flare",
+  "llm_model_rascunho": null,
+  "llm_model_revisao": null,
+  "llm_model_auditoria": null,
+  "caminho_repo": null,
+  "output_dir": null
+}

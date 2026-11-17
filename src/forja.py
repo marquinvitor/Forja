@@ -1,3 +1,5 @@
+import argparse
+import json
 import os
 import re
 import shutil
@@ -5,9 +7,15 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from crewai import Agent, Task, Crew, Process, LLM
-import litellm
-from dotenv import load_dotenv
+
+# O Forja processa prompts e código do usuário. O tracing do CrewAI não é
+# necessário para gerar projetos e pode solicitar o compartilhamento da
+# execução; fica desativado por padrão, com possibilidade de sobrescrita pelo
+# ambiente para quem desejar habilitá-lo explicitamente.
+os.environ.setdefault("CREWAI_DISABLE_TELEMETRY", "true")
+os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
+
+from crewai import Agent, Task, Crew, Process
 
 # Garante que o diretório 'src' esteja no sys.path para imports locais
 _SRC_DIR = Path(__file__).resolve().parent
@@ -15,37 +23,22 @@ if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
 from topicos_poo import preparar, TOPICOS
-
-load_dotenv()
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-CAMINHO_REPO   = os.getenv("CAMINHO_REPO", os.path.expanduser("~/arcade/base"))
-OUTPUT_DIR     = os.getenv("OUTPUT_DIR", os.path.expanduser("~/QuestionCreate/output"))
+from llm_config import carregar_configuracao, criar_llms
+from catalogo_modelos import atualizar_catalogo_openai, resolver_chave
+from persistencia import (
+    carregar_settings,
+    resolver_caminho_repo,
+    resolver_output_dir,
+    resolver_settings_path,
+    arquivo_cache_modelos,
+)
+from painel_web import serve as serve_painel
+from projetos import atualizar_projeto, projeto_por_caminho, registrar_projeto
+from repositorio import resolver_repositorio
+from capa import gerar_capa_openai
 
 TIPO_ATIVIDADE = "TRAIN"
 MAX_TENTATIVAS = 3
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY não encontrada no .env")
-
-# gambiarra pra nao usar cache
-litellm.cache = None
-_orig_completion = litellm.completion
-
-def _safe_completion(**kwargs):
-    if isinstance(kwargs.get("cache"), bool):
-        kwargs.pop("cache")
-    for msg in kwargs.get("messages", []):
-        msg.pop("cache_breakpoint", None)
-        if isinstance(msg.get("content"), list):
-            for bloco in msg["content"]:
-                if isinstance(bloco, dict):
-                    bloco.pop("cache_control", None)
-    return _orig_completion(**kwargs)
-
-litellm.completion = _safe_completion
-os.environ["CREWAI_DISABLE_PROMPT_CACHING"] = "true"
-
 
 # ─── blocos de texto gerados pelos agentes ───────────────────────────────────
 
@@ -121,23 +114,39 @@ def extrair_testes_readme(readme: str) -> list[dict]:
     blocos = re.findall(r"```bash[ \t]*\n(.*?)```", readme, re.DOTALL)
     return parsear_casos("\n".join(blocos))
 
-def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esqueleto: str = "", prompt: str = ""):
+def salvar_questao(
+    output_dir: str,
+    nome: str,
+    readme: str,
+    solucao: str,
+    esqueleto: str = "",
+    prompt: str = "",
+    titulo: str | None = None,
+    topicos: list[str] | None = None,
+    topicos_input: str = "",
+):
     pasta = Path(output_dir) / nome
     (pasta / "assets").mkdir(parents=True, exist_ok=True)
     (pasta / "src" / "kt").mkdir(parents=True, exist_ok=True)
+    (pasta / "starter" / "kt").mkdir(parents=True, exist_ok=True)
     (pasta / "README.md").write_text(readme, encoding="utf-8")
     if solucao:
-        (pasta / "src" / "kt" / "main.kt").write_text(solucao, encoding="utf-8")
+        (pasta / "src" / "kt" / "shell.kt").write_text(solucao, encoding="utf-8")
     if esqueleto:
-        (pasta / "src" / "kt" / "shell.kt").write_text(esqueleto, encoding="utf-8")
+        (pasta / "starter" / "kt" / "shell.kt").write_text(esqueleto, encoding="utf-8")
     if prompt:
-        (pasta / "prompt.txt").write_text(prompt, encoding="utf-8")
+        (pasta / "prompt.json").write_text(json.dumps({
+            "titulo": titulo or nome,
+            "prompt": prompt,
+            "topicos": topicos_input,
+            "topicos_detectados": list(topicos or []),
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"\nQuestão salva em: {pasta}")
     print("✓ README.md (enunciado e testes)")
-    print("✓ src/kt/main.kt (solução completa resolvida)" if solucao else "⚠ Sem solução para salvar em src/kt/main.kt")
-    print("✓ src/kt/shell.kt (esqueleto com TODOs para o estudante)" if esqueleto else "⚠ Sem esqueleto para salvar em src/kt/shell.kt")
+    print("✓ src/kt/shell.kt (solução completa resolvida)" if solucao else "⚠ Sem solução para salvar em src/kt/shell.kt")
+    print("✓ starter/kt/shell.kt (esqueleto com TODOs para o estudante)" if esqueleto else "⚠ Sem esqueleto para salvar em starter/kt/shell.kt")
     if prompt:
-        print("✓ prompt.txt (prompt utilizado na geração)")
+        print("✓ prompt.json (título, prompt e tópicos utilizados na geração)")
     print("⚠ Falta adicionar a capa: assets/cover.webp")
 
 
@@ -164,11 +173,11 @@ def compilar_e_executar(codigo_kt: str, testes: list[dict], timeout_execucao: in
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        (tmp_path / "main.kt").write_text(codigo_kt, encoding="utf-8")
+        (tmp_path / "shell.kt").write_text(codigo_kt, encoding="utf-8")
 
         try:
             compilacao = subprocess.run(
-                ["kotlinc", "main.kt", "-include-runtime", "-d", "main.jar"],
+                ["kotlinc", "shell.kt", "-include-runtime", "-d", "main.jar"],
                 cwd=tmp_path, capture_output=True, text=True, timeout=240,  # kotlinc é lento na 1ª vez
             )
         except subprocess.TimeoutExpired:
@@ -229,71 +238,42 @@ def kickoff_seguro(crew: Crew, contexto: str) -> bool:
         return False
 
 
-# config  (troque pelos modelos que você escolheu; o pensamento conta no max_tokens, então deixe folga)
-
-llm_rascunho = LLM(
-    model="gemini/gemini-3.5-flash-lite",
-    api_key=GEMINI_API_KEY,
-    temperature=1.0,
-    max_retries=3,
-    timeout=600,
-    max_tokens=8000
-)
-
-llm_revisao = LLM(
-    model="gemini/gemini-3.8-flash",
-    api_key=GEMINI_API_KEY,
-    temperature=1.0,
-    max_retries=3,
-    timeout=600,
-    max_tokens=16000
-)
-
-llm_auditoria = LLM(
-    model="gemini/gemini-3.5-flash-lite",
-    api_key=GEMINI_API_KEY,
-    temperature=1.0,
-    max_retries=3,
-    timeout=600,
-    max_tokens=16000
-)
+llm_auditoria = None
+designer_criativo = None
+especialista_poo = None
+auditor_tecnico = None
 
 
-# ─── agentes ─────────────────────────────────────────────────────────────────
+def inicializar_agentes(settings: dict) -> None:
+    """Cria os agentes depois que o settings.json e o provedor foram resolvidos."""
+    global llm_auditoria, designer_criativo, especialista_poo, auditor_tecnico
+    llms = criar_llms(carregar_configuracao(settings))
+    llm_rascunho = llms["rascunho"]
+    llm_revisao = llms["revisao"]
+    llm_auditoria = llms["auditoria"]
 
-designer_criativo = Agent(
-    role='Designer Instrucional de TI',
-    goal='Criar enunciados claros aplicando os tópicos pedidos exatamente como o repositório os aplica.',
-    backstory='Professor que transforma conceitos de programação em desafios práticos.',
-    verbose=False,
-    allow_delegation=False,
-    max_iter=2,
-    llm=llm_rascunho
-)
-
-especialista_poo = Agent(
-    role='Especialista em POO Kotlin',
-    goal='Garantir rigor técnico, sintaxe correta e gerar os arquivos finais em Kotlin.',
-    backstory='Desenvolvedor sênior de Kotlin com foco em design patterns e ensino de POO.',
-    verbose=False,
-    allow_delegation=False,
-    max_iter=2,
-    llm=llm_revisao
-)
-
-auditor_tecnico = Agent(
-    role='Auditor Técnico de Qualidade',
-    goal='Produzir uma solução de referência completa e correta em Kotlin a partir do enunciado, para validar a consistência técnica da questão.',
-    backstory=(
-        'Engenheiro de QA especialista em Kotlin, focado em garantir que toda questão publicada '
-        'seja tecnicamente irretocável antes de chegar aos alunos. Não confia em enunciados: '
-        'implementa a solução do zero e deixa a compilação/execução real falarem por si.'
-    ),
-    verbose=False,
-    allow_delegation=False,
-    max_iter=2,
-    llm=llm_auditoria
-)
+    designer_criativo = Agent(
+        role='Designer Instrucional de TI',
+        goal='Criar enunciados claros aplicando os tópicos pedidos exatamente como o repositório os aplica.',
+        backstory='Professor que transforma conceitos de programação em desafios práticos.',
+        verbose=False, allow_delegation=False, max_iter=2, llm=llm_rascunho
+    )
+    especialista_poo = Agent(
+        role='Especialista em POO Kotlin',
+        goal='Garantir rigor técnico, sintaxe correta e gerar os arquivos finais em Kotlin.',
+        backstory='Desenvolvedor sênior de Kotlin com foco em design patterns e ensino de POO.',
+        verbose=False, allow_delegation=False, max_iter=2, llm=llm_revisao
+    )
+    auditor_tecnico = Agent(
+        role='Auditor Técnico de Qualidade',
+        goal='Produzir uma solução de referência completa e correta em Kotlin a partir do enunciado, para validar a consistência técnica da questão.',
+        backstory=(
+            'Engenheiro de QA especialista em Kotlin, focado em garantir que toda questão publicada '
+            'seja tecnicamente irretocável antes de chegar aos alunos. Não confia em enunciados: '
+            'implementa a solução do zero e deixa a compilação/execução real falarem por si.'
+        ),
+        verbose=False, allow_delegation=False, max_iter=2, llm=llm_auditoria
+    )
 
 
 def chamar_llm(prompt: str) -> str:
@@ -482,7 +462,7 @@ ESCOPO = (
 
 def criar_tarefa_gabarito(readme: str, shell: str) -> Task:
     return Task(
-        description=f"""Você é o Auditor Técnico. Com base no enunciado (README) e no esqueleto (main.kt)
+        description=f"""Você é o Auditor Técnico. Com base no enunciado (README) e no esqueleto (starter/kt/shell.kt)
 abaixo, implemente uma SOLUÇÃO DE REFERÊNCIA completa e funcional em Kotlin, substituindo todos os
 TODO(...) e comentários TODO por lógica correta.
 
@@ -501,13 +481,13 @@ REGRAS:
 - O código deve compilar sem erros com kotlinc.
 - Responda DIRETAMENTE com o marcador, sem raciocínio e sem texto fora do bloco.
 
-IMPORTANTE: não envolva o código em blocos markdown (```). Escreva o main.kt diretamente entre o marcador
+IMPORTANTE: não envolva o código em blocos markdown (```). Escreva o código Kotlin diretamente entre o marcador
 de abertura e <<<END>>>: o conteúdo vai direto para o compilador. NÃO esqueça de fechar com <<<END>>>.
 
 <<<GABARITO>>>
-(main.kt completo, com todas as classes implementadas)
+(shell.kt completo, com todas as classes implementadas)
 <<<END>>>""",
-        expected_output='Um bloco <<<GABARITO>>> com o main.kt totalmente implementado, fechado com <<<END>>>.',
+        expected_output='Um bloco <<<GABARITO>>> com o shell.kt totalmente implementado, fechado com <<<END>>>.',
         agent=auditor_tecnico
     )
 
@@ -516,7 +496,7 @@ def criar_tarefa_correcao(readme: str, shell: str, diagnostico: str, contexto: s
                           exemplos_repo: str, topicos_txt: str) -> Task:
     return Task(
         description=f"""A questão abaixo falhou na auditoria técnica automática. Corrija o README.md (incluindo os
-casos de teste) e/ou o main.kt (esqueleto) para eliminar os problemas apontados no relatório.
+casos de teste) e/ou o starter/kt/shell.kt (esqueleto) para eliminar os problemas apontados no relatório.
 
 Tópicos que a questão deve aplicar: {topicos_txt}.
 
@@ -539,7 +519,7 @@ INSTRUÇÕES:
 - Corrija apenas o necessário, sem descaracterizar a questão. Preserve o pedido original: "{contexto}"
 - O README continua no formato do repositório (front matter, Intro, Regras, Diagrama,Guide, Shell).
 {REGRAS_TESTES}
-- O main.kt entregue continua sendo um ESQUELETO: métodos só com TODO("..."), e a main completa:
+- O starter/kt/shell.kt entregue continua sendo um ESQUELETO: métodos só com TODO("..."), e a main completa:
 {REGRAS_MAIN}
 
 Use EXATAMENTE estes marcadores (sem cercas markdown em volta dos blocos):
@@ -549,37 +529,93 @@ Use EXATAMENTE estes marcadores (sem cercas markdown em volta dos blocos):
 <<<END>>>
 
 <<<SHELL>>>
-(main.kt corrigido, ainda como esqueleto com TODO)
+(shell.kt corrigido, ainda como esqueleto com TODO)
 <<<END>>>""",
         expected_output='Dois blocos <<<README>>> e <<<SHELL>>>, cada um fechado com <<<END>>>.',
         agent=especialista_poo
     )
 
 
-def main():
+def main(argv=None):
     # Input do usuario
+
+    parser = argparse.ArgumentParser(description="Gerador de questões POO em Kotlin")
+    parser.add_argument("command", nargs="?", choices=["open", "models"], help="abre o painel ou gerencia modelos")
+    parser.add_argument("model_action", nargs="?", choices=["update"], help="atualiza o catálogo de modelos")
+    parser.add_argument("--provider", choices=["openai"], default="openai", help="provedor usado na atualização")
+    parser.add_argument("--description", help="descrição do projeto (modo não interativo)")
+    parser.add_argument("--name", help="nome da pasta do projeto (modo não interativo)")
+    parser.add_argument("--topics", help="IDs de tópicos separados por vírgula")
+    parser.add_argument("--topics-input", help="texto bruto dos tópicos informado pelo usuário")
+    parser.add_argument("--yes", action="store_true", help="confirma os tópicos automaticamente")
+    parser.add_argument("--cover", action="store_true", help="gera assets/cover.webp com OpenAI")
+    parser.add_argument("--max-attempts", type=int, default=MAX_TENTATIVAS,
+                        help="limite de tentativas de correção (padrão: 3)")
+    parser.add_argument(
+        "--settings",
+        metavar="PASTA",
+        help="pasta que contém ou conterá settings.json",
+    )
+    parser.add_argument("--port", type=int, default=8765, help="porta do painel web (usado com open)")
+    parser.add_argument("--no-browser", action="store_true", help="não abrir o navegador (usado com open)")
+    args = parser.parse_args(argv)
+    if not 1 <= args.max_attempts <= 10:
+        parser.error("--max-attempts deve estar entre 1 e 10")
+    settings_path = resolver_settings_path(args.settings)
+    if args.command == "open":
+        carregar_settings(settings_path)
+        serve_painel(settings_path, port=args.port, open_browser=not args.no_browser)
+        return
+    if args.command == "models":
+        if args.model_action != "update":
+            parser.error("use 'forja models update'")
+        settings = carregar_settings(settings_path)
+        modelos = atualizar_catalogo_openai(resolver_chave(settings, args.provider))
+        print(f"{len(modelos)} modelos OpenAI salvos em {arquivo_cache_modelos()}")
+        return
+    settings = carregar_settings(settings_path)
+    inicializar_agentes(settings)
+    caminho_repo = str(resolver_repositorio(settings))
+    output_dir = resolver_output_dir(settings)
 
     print("=== Gerador de Questões POO (Kotlin) ===\n")
     print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
-    descricao = input(
+    descricao = (args.description or input(
         "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
-    ).strip()
+    )).strip()
     tipo = TIPO_ATIVIDADE
-    nome_questao = input("Nome da pasta de saída: ").strip().replace(" ", "_") or "questao"
+    nome_questao = (args.name or input("Nome da pasta de saída: ")).strip().replace(" ", "_") or "questao"
 
     print("\nAnalisando tópicos e carregando exemplos do repositório...")
-    topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
+    topicos_input = args.topics_input if args.topics_input is not None else (args.topics or "")
+    topicos_selecionados = [item.strip() for item in re.split(r"[;,\s]+", topicos_input) if item.strip()] or None
+    topicos, exemplos = preparar(descricao, caminho_repo, chamar_llm, topicos=topicos_selecionados)
     # Para fixar os tópicos manualmente (sem detecção automática), use:
-    # topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
+    # topicos, exemplos = preparar(descricao, caminho_repo, chamar_llm,
     #                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
 
     topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos)
     contexto_usuario = descricao
     entrada_usuario = descricao
 
-    confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
+    confirma = "s" if args.yes else input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
     if confirma == "n":
         raise SystemExit(0)
+
+    caminho_projeto = Path(output_dir) / nome_questao
+    registro = projeto_por_caminho(caminho_projeto)
+    if registro is None:
+        if caminho_projeto.exists():
+            raise ValueError(f"Já existe um projeto em {caminho_projeto}; escolha outro nome.")
+        llm_config = carregar_configuracao(settings)
+        registro = registrar_projeto(
+            nome_questao, caminho_projeto, descricao, provider=llm_config.provedor,
+            models=llm_config.modelos, topics=topicos, topics_input=topicos_input,
+        )
+    else:
+        llm_config = carregar_configuracao(settings)
+    registro = atualizar_projeto(registro["id"], topics=topicos, topics_input=topicos_input,
+                                 models=llm_config.modelos, provider=llm_config.provedor, description=descricao)
 
     # ─── tasks ──────────────────────────────────────────────────────
 
@@ -639,7 +675,7 @@ def main():
     )
 
     tarefa_shell = Task(
-        description=f"""Com base na questão e nos testes gerados, crie o main.kt (em Kotlin).
+        description=f"""Com base na questão e nos testes gerados, crie o shell.kt resolvido (em Kotlin).
     Tópicos aplicados na questão: {topicos_txt}.
 
     {ESTILO_KOTLIN}
@@ -667,9 +703,9 @@ def main():
     Use EXATAMENTE este marcador:
 
     <<<SHELL>>>
-    (conteúdo completo do main.kt)
+    (conteúdo completo do shell.kt)
     <<<END>>>""",
-        expected_output='Um bloco <<<SHELL>>> com o main.kt completo (esqueleto) fechado com <<<END>>>.',
+        expected_output='Um bloco <<<SHELL>>> com o shell.kt completo (esqueleto) fechado com <<<END>>>.',
         agent=especialista_poo
     )
 
@@ -706,12 +742,13 @@ def main():
     gabarito_atual = ""
     diagnostico = ""
 
-    for tentativa in range(1, MAX_TENTATIVAS + 1):
-        print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
+    limite_tentativas = args.max_attempts
+    for tentativa in range(1, limite_tentativas + 1):
+        print(f"\n=== Auditoria técnica — tentativa {tentativa}/{limite_tentativas} ===")
 
         if "TODO" not in shell_atual:
             # o esqueleto veio com a lógica pronta: não há nada para o aluno implementar
-            diagnostico = ("O main.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
+            diagnostico = ("O starter/kt/shell.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
                            "apenas TODO(\"...\") no corpo; só a função main fica completa.")
             gabarito_atual = ""
         else:
@@ -747,7 +784,7 @@ def main():
 
         print(f"✗ Falhas detectadas:\n{diagnostico}")
 
-        if tentativa == MAX_TENTATIVAS:
+        if tentativa == limite_tentativas:
             print("\nLimite de tentativas atingido sem consistência técnica total.")
             break
 
@@ -773,16 +810,39 @@ def main():
     status = (
         "APROVADA na auditoria técnica"
         if aprovado
-        else f"NÃO validada após {MAX_TENTATIVAS} tentativas (recomenda-se revisão manual)"
+        else f"NÃO validada após {limite_tentativas} tentativas (recomenda-se revisão manual)"
     )
     print(f"\nStatus final da questão: {status}")
 
-    salvar_questao(OUTPUT_DIR, nome_questao, readme_atual, gabarito_atual, shell_atual, entrada_usuario)
+    titulo_projeto = nome_questao
+    titulo_match = re.search(r"(?m)^#\s+(.+?)\s*$", readme_atual)
+    if titulo_match:
+        titulo_projeto = titulo_match.group(1).strip()
+    salvar_questao(
+        output_dir, nome_questao, readme_atual, gabarito_atual, shell_atual,
+        entrada_usuario, titulo_projeto, topicos, topicos_input,
+    )
+
+    if args.cover:
+        if llm_config.provedor != "openai":
+            print("⚠ Capa não gerada: a criação de imagens exige o provedor OpenAI.")
+        else:
+            try:
+                capa = gerar_capa_openai(
+                    llm_config.api_key, descricao, caminho_projeto / "assets" / "cover.webp",
+                    str(settings.get("openai_image_model") or "gpt-image-2.5-flare"),
+                )
+                print(f"✓ Capa gerada em: {capa}")
+            except Exception as error:  # noqa: BLE001
+                print(f"⚠ Não foi possível gerar a capa: {type(error).__name__}: {error}")
 
     if not aprovado:
-        log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
+        log_path = Path(output_dir) / nome_questao / "diagnostico_final.txt"
         log_path.write_text(diagnostico, encoding="utf-8")
         print(f"✗ Diagnóstico final salvo em: {log_path}")
+    atualizar_projeto(registro["id"], status="approved" if aprovado else "failed",
+                      approved=aprovado, attempts=limite_tentativas,
+                      diagnostic_path=str(log_path) if not aprovado else None)
 
 
 if __name__ == "__main__":

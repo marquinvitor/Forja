@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "forja"
 version = "0.1.0"
@@ -7,8 +11,16 @@ requires-python = ">=3.12"
 dependencies = [
     "crewai[google-genai]>=1.15.28",
     "litellm>=1.106.1",
-    "python-dotenv>=1.0.0",
+    "platformdirs>=4.3.0",
+    "pillow>=10.0.0",
 ]
 
-[tool.uv]
-package = false
+[project.scripts]
+forja = "forja:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["forja", "llm_config", "persistencia", "painel_web", "catalogo_modelos", "projetos", "repositorio", "capa", "topicos_poo"]
+
+[tool.setuptools.package-data]
+"*" = ["forja_panel.html"]

@@ -6,7 +6,7 @@ Ideia: o sistema aprende "como o professor aplica cada tópico" olhando as quest
   1. TOPICOS: índice tópico -> questões-exemplo do repositório (edite à vontade).
   2. detectar_topicos(): descrição natural -> ids de tópicos (palavras-chave + LLM opcional).
   3. obter_padrao(): o LLM lê o exemplo real e resume como o tópico foi aplicado.
-     O resultado é salvo em data/padroes.json -> revise/corrija esse arquivo à mão.
+     O resultado é salvo no cache de usuário da Forja.
   4. preparar(): devolve o texto de contexto pronto para injetar nos prompts.
 """
 from __future__ import annotations
@@ -15,6 +15,8 @@ import re
 import unicodedata
 from pathlib import Path
 from typing import Callable, Optional
+
+from persistencia import arquivo_cache_padroes
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. ÍNDICE: tópico -> questões do repositório (slug = trecho do nome da pasta)
@@ -87,13 +89,10 @@ ORDEM_LINGUAGENS = [".kt", ".java", ".ts", ".py"]   # preferência ao escolher a
 SUFIXOS_CODIGO = set(ORDEM_LINGUAGENS)
 DICAS_SOLUCAO = ("solution", "solucao", "gabarito", "shell", "main")
 
-# Caminho do catálogo/cache de padrões: data/padroes.json na raiz do projeto
+# O cache gerado fica no diretório de cache do usuário; o projeto não é alterado.
 _RAIZ_PROJETO = Path(__file__).resolve().parent.parent
-PADROES_JSON = _RAIZ_PROJETO / "data" / "padroes.json"
-if not PADROES_JSON.exists():
-    _fallback_local = Path(__file__).resolve().parent / "padroes.json"
-    if _fallback_local.exists():
-        PADROES_JSON = _fallback_local
+PADROES_JSON = arquivo_cache_padroes()
+PADROES_INICIAL = _RAIZ_PROJETO / "data" / "padroes.json"
 
 
 def _norm(t: str) -> str:
@@ -177,7 +176,12 @@ def ler_exemplo(pasta: Path, limite_readme: int = 2200, limite_codigo: int = 120
 
 
 def _ler_cache() -> dict:
-    return json.loads(PADROES_JSON.read_text(encoding="utf-8")) if PADROES_JSON.exists() else {}
+    cache = {}
+    if PADROES_INICIAL.exists():
+        cache.update(json.loads(PADROES_INICIAL.read_text(encoding="utf-8")))
+    if PADROES_JSON.exists():
+        cache.update(json.loads(PADROES_JSON.read_text(encoding="utf-8")))
+    return cache
 
 
 def obter_padrao(topico: str, slug: str, exemplo: str, chamar_llm: Optional[Callable[[str], str]]) -> str:
@@ -189,7 +193,7 @@ def obter_padrao(topico: str, slug: str, exemplo: str, chamar_llm: Optional[Call
     if chamar_llm is None:
         return ""
     print(f"  → resumindo o exemplo '{slug}' ({TOPICOS[topico]['titulo']}); "
-          f"só na 1ª vez, depois fica salvo em data/padroes.json...")
+          f"só na 1ª vez, depois fica salvo no cache do usuário...")
 
     prompt = f"""Você analisa uma questão de POO de um repositório didático.
 Tópico a observar: {TOPICOS[topico]['titulo']}.
@@ -225,6 +229,12 @@ def preparar(descricao: str, caminho_repo: str,
     Passe `topicos=[...]` para escolher à mão (sem detecção automática).
     Tópicos pedidos: padrão + exemplo completo. Pré-requisitos: só o padrão.
     """
+    raiz_repo = Path(caminho_repo).expanduser()
+    if not raiz_repo.is_dir():
+        raise ValueError(
+            f"Repositório de referência não encontrado: {raiz_repo}. "
+            "Configure 'caminho_repo' na aba Ambiente ou deixe-o vazio para usar o clone automático."
+        )
     pedidos = [t for t in (topicos or detectar_topicos(descricao, chamar_llm)) if t in TOPICOS]
     if not pedidos:
         raise ValueError("Nenhum tópico reconhecido. Passe topicos=[...] ou use palavras do vocabulário.")
