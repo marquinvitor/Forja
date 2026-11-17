@@ -1,0 +1,1 @@
+2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total

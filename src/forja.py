@@ -2,11 +2,17 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from crewai import Agent, Task, Crew, Process, LLM
 import litellm
 from dotenv import load_dotenv
+
+# Garante que o diretório 'src' esteja no sys.path para imports locais
+_SRC_DIR = Path(__file__).resolve().parent
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
 
 from topicos_poo import preparar, TOPICOS
 
@@ -115,7 +121,7 @@ def extrair_testes_readme(readme: str) -> list[dict]:
     blocos = re.findall(r"```bash[ \t]*\n(.*?)```", readme, re.DOTALL)
     return parsear_casos("\n".join(blocos))
 
-def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esqueleto: str = ""):
+def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esqueleto: str = "", prompt: str = ""):
     pasta = Path(output_dir) / nome
     (pasta / "assets").mkdir(parents=True, exist_ok=True)
     (pasta / "src" / "kt").mkdir(parents=True, exist_ok=True)
@@ -124,10 +130,14 @@ def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esquel
         (pasta / "src" / "kt" / "main.kt").write_text(solucao, encoding="utf-8")
     if esqueleto:
         (pasta / "src" / "kt" / "shell.kt").write_text(esqueleto, encoding="utf-8")
+    if prompt:
+        (pasta / "prompt.txt").write_text(prompt, encoding="utf-8")
     print(f"\nQuestão salva em: {pasta}")
     print("✓ README.md (enunciado e testes)")
     print("✓ src/kt/main.kt (solução completa resolvida)" if solucao else "⚠ Sem solução para salvar em src/kt/main.kt")
     print("✓ src/kt/shell.kt (esqueleto com TODOs para o estudante)" if esqueleto else "⚠ Sem esqueleto para salvar em src/kt/shell.kt")
+    if prompt:
+        print("✓ prompt.txt (prompt utilizado na geração)")
     print("⚠ Falta adicionar a capa: assets/cover.webp")
 
 
@@ -293,31 +303,6 @@ def chamar_llm(prompt: str) -> str:
     except Exception as e:
         print(f"⚠ chamar_llm falhou: {type(e).__name__}: {e}")
         return ""
-
-
-# Input do usuario
-
-print("=== Gerador de Questões POO (Kotlin) ===\n")
-print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
-descricao = input(
-    "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
-).strip()
-tipo = TIPO_ATIVIDADE
-nome_questao = input("Nome da pasta de saída: ").strip().lower().replace(" ", "_") or "questao"
-
-print("\nAnalisando tópicos e carregando exemplos do repositório...")
-topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
-# Para fixar os tópicos manualmente (sem detecção automática), use:
-# topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
-#                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
-
-topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos)
-contexto_usuario = descricao
-entrada_usuario = descricao
-
-confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
-if confirma == "n":
-    raise SystemExit(0)
 
 
 # ─── formatos e regras (constantes raw: têm {}, $ e \\ que quebrariam f-strings) ──────
@@ -493,99 +478,6 @@ ESCOPO = (
 )
 
 
-# ─── tasks ──────────────────────────────────────────────────────
-
-tarefa_rascunho = Task(
-    description=f"""Crie uma questão de programação em Kotlin para o seguinte pedido do professor:
-"{entrada_usuario}"
-
-Tópicos que a questão DEVE aplicar: {topicos_txt}.
-{ESCOPO}
-
-{exemplos}
-
-Sua questão deve:
-- Aplicar cada tópico pedido do MESMO modo que nos exemplos acima (copie a forma de aplicar o conceito,
-  não o domínio dos exemplos);
-- Ter Título;
-- Ter Descrição, Domínio e Objetivos, uma frase cada (como no resumo do início dos exemplos);
-- Ter uma Intro com a história e a descrição das classes, atributos, construtor e métodos;
-- Ter uma lista de Regras;
-- Listar os COMANDOS do programa (nome, argumentos de uma palavra, e o que imprimem);
-- Ter 5 casos de teste (comandos e saída esperada).
-- Sugerir uma ordem de implementação em partes (o que fazer primeiro, depois e por último) e uma ou mais perguntas
-  de reflexão sobre decisões de design, que servirão de base para a seção Guide;
-
-{REGRAS_MENSAGENS}
-
-Não inclua gabarito. Apenas enunciado e testes.""",
-    expected_output='Enunciado completo com título, descrição, domínio, objetivos, intro, regras, comandos e casos de teste.',
-    agent=designer_criativo
-)
-
-tarefa_arquivos = Task(
-    description=f"""Com base na questão criada, escreva o README.md COMPLETO, exatamente no formato do repositório.
-Tipo da atividade (use no título): [{tipo}]
-Contexto da história: "{contexto_usuario}"
-Tópicos aplicados: {topicos_txt}.
-
-FORMATO (siga a estrutura e os nomes das seções; troque o conteúdo entre parênteses):
-{FORMATO_README}
-
-{REGRAS_TESTES}
-
-REGRAS DO README:
-- A Intro deve ter uma HISTÓRIA criativa e envolvente relacionada ao contexto, como um cenário real de trabalho,
-  com personagens, um problema concreto e o motivo de o sistema ser construído; depois descreva as classes,
-  atributos, construtor, métodos, comandos e mensagens esperados.
-- O diagrama deve refletir as classes da questão, com os tipos de retorno corretos.
-- Inclua a seção "## Guide" com instruções de implementação passo a passo e perguntas de reflexão.
-
-Use EXATAMENTE este marcador:
-
-<<<README>>>
-(README.md completo)
-<<<END>>>""",
-    expected_output='Um bloco <<<README>>> com o README.md completo, fechado com <<<END>>>.',
-    agent=especialista_poo
-)
-
-tarefa_shell = Task(
-    description=f"""Com base na questão e nos testes gerados, crie o main.kt (em Kotlin).
-Tópicos aplicados na questão: {topicos_txt}.
-
-{ESTILO_KOTLIN}
-
-OBJETIVO: gerar um ESQUELETO para o aluno completar.
-
-REGRA PRINCIPAL — dois tipos de conteúdo no arquivo:
-
-1. CLASSES (para o aluno implementar):
-   - Declare os atributos com tipo explícito e valor neutro ("" / 0 / 0.0 / false / lista vazia), para o arquivo compilar.
-     Se o enunciado pede encapsulamento, use 'private'.
-   - Cada método deve ter a assinatura correta e o tipo de retorno correto, e o corpo contém APENAS:
-       TODO("descreva o que o método deve fazer")
-   - Se precisar inicializar no construtor, use um bloco init contendo apenas: // TODO: inicialize os atributos
-   - Use herança ('open class' / 'override'), enum class, MutableMap, exceções etc. SOMENTE se o enunciado exigir.
-   - NÃO escreva nenhuma lógica real nas classes.
-
-2. FUNÇÃO main (completamente implementada, SIGA ESTAS REGRAS EXATAMENTE):
-{REGRAS_MAIN}
-
-O exemplo abaixo serve APENAS para mostrar o FORMATO do arquivo (adapte classes e comandos ao contexto
-"{contexto_usuario}"; NÃO copie o domínio da questão animal):
-{SHELL_ESQUELETO_EXEMPLO}
-
-Use EXATAMENTE este marcador:
-
-<<<SHELL>>>
-(conteúdo completo do main.kt)
-<<<END>>>""",
-    expected_output='Um bloco <<<SHELL>>> com o main.kt completo (esqueleto) fechado com <<<END>>>.',
-    agent=especialista_poo
-)
-
-
 # ─── tasks do ciclo de auditoria ──────────────────────────────────────────
 
 def criar_tarefa_gabarito(readme: str, shell: str) -> Task:
@@ -664,113 +556,234 @@ Use EXATAMENTE estes marcadores (sem cercas markdown em volta dos blocos):
     )
 
 
-# ─── execucao da geracao de questoes ────────────────────────────────────────────
+def main():
+    # Input do usuario
 
-equipe = Crew(
-    agents=[designer_criativo, especialista_poo],
-    tasks=[tarefa_rascunho, tarefa_arquivos, tarefa_shell],
-    process=Process.sequential
-)
+    print("=== Gerador de Questões POO (Kotlin) ===\n")
+    print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
+    descricao = input(
+        "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
+    ).strip()
+    tipo = TIPO_ATIVIDADE
+    nome_questao = input("Nome da pasta de saída: ").strip().replace(" ", "_") or "questao"
 
-print("\nGerando questão...\n")
-if not kickoff_seguro(equipe, "geração do rascunho inicial"):
-    raise SystemExit(1)
+    print("\nAnalisando tópicos e carregando exemplos do repositório...")
+    topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
+    # Para fixar os tópicos manualmente (sem detecção automática), use:
+    # topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
+    #                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
 
-saida_arquivos = str(tarefa_arquivos.output) if tarefa_arquivos.output else ""
-saida_shell    = str(tarefa_shell.output) if tarefa_shell.output else ""
+    topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos)
+    contexto_usuario = descricao
+    entrada_usuario = descricao
 
-readme_atual = extrair_bloco(saida_arquivos, "README")
-shell_atual  = extrair_codigo(saida_shell, "SHELL")
+    confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
+    if confirma == "n":
+        raise SystemExit(0)
 
-if not (readme_atual and shell_atual and extrair_testes_readme(readme_atual)):
-    print("\nFaltou algum bloco (README, SHELL) ou o README não tem casos de teste válidos.")
-    print("\n--- Saída bruta (README) ---\n" + saida_arquivos)
-    print("\n--- Saída bruta (SHELL) ---\n" + saida_shell)
-    raise SystemExit(1)
+    # ─── tasks ──────────────────────────────────────────────────────
+
+    tarefa_rascunho = Task(
+        description=f"""Crie uma questão de programação em Kotlin para o seguinte pedido do professor:
+    "{entrada_usuario}"
+
+    Tópicos que a questão DEVE aplicar: {topicos_txt}.
+    {ESCOPO}
+
+    {exemplos}
+
+    Sua questão deve:
+    - Aplicar cada tópico pedido do MESMO modo que nos exemplos acima (copie a forma de aplicar o conceito,
+      não o domínio dos exemplos);
+    - Ter Título;
+    - Ter Descrição, Domínio e Objetivos, uma frase cada (como no resumo do início dos exemplos);
+    - Ter uma Intro com a história e a descrição das classes, atributos, construtor e métodos;
+    - Ter uma lista de Regras;
+    - Listar os COMANDOS do programa (nome, argumentos de uma palavra, e o que imprimem);
+    - Ter 5 casos de teste (comandos e saída esperada).
+    - Sugerir uma ordem de implementação em partes (o que fazer primeiro, depois e por último) e uma ou mais perguntas
+      de reflexão sobre decisões de design, que servirão de base para a seção Guide;
+
+    {REGRAS_MENSAGENS}
+
+    Não inclua gabarito. Apenas enunciado e testes.""",
+        expected_output='Enunciado completo com título, descrição, domínio, objetivos, intro, regras, comandos e casos de teste.',
+        agent=designer_criativo
+    )
+
+    tarefa_arquivos = Task(
+        description=f"""Com base na questão criada, escreva o README.md COMPLETO, exatamente no formato do repositório.
+    Tipo da atividade (use no título): [{tipo}]
+    Contexto da história: "{contexto_usuario}"
+    Tópicos aplicados: {topicos_txt}.
+
+    FORMATO (siga a estrutura e os nomes das seções; troque o conteúdo entre parênteses):
+    {FORMATO_README}
+
+    {REGRAS_TESTES}
+
+    REGRAS DO README:
+    - A Intro deve ter uma HISTÓRIA criativa e envolvente relacionada ao contexto, como um cenário real de trabalho,
+      com personagens, um problema concreto e o motivo de o sistema ser construído; depois descreva as classes,
+      atributos, construtor, métodos, comandos e mensagens esperados.
+    - O diagrama deve refletir as classes da questão, com os tipos de retorno corretos.
+    - Inclua a seção "## Guide" com instruções de implementação passo a passo e perguntas de reflexão.
+
+    Use EXATAMENTE este marcador:
+
+    <<<README>>>
+    (README.md completo)
+    <<<END>>>""",
+        expected_output='Um bloco <<<README>>> com o README.md completo, fechado com <<<END>>>.',
+        agent=especialista_poo
+    )
+
+    tarefa_shell = Task(
+        description=f"""Com base na questão e nos testes gerados, crie o main.kt (em Kotlin).
+    Tópicos aplicados na questão: {topicos_txt}.
+
+    {ESTILO_KOTLIN}
+
+    OBJETIVO: gerar um ESQUELETO para o aluno completar.
+
+    REGRA PRINCIPAL — dois tipos de conteúdo no arquivo:
+
+    1. CLASSES (para o aluno implementar):
+       - Declare os atributos com tipo explícito e valor neutro ("" / 0 / 0.0 / false / lista vazia), para o arquivo compilar.
+         Se o enunciado pede encapsulamento, use 'private'.
+       - Cada método deve ter a assinatura correta e o tipo de retorno correto, e o corpo contém APENAS:
+           TODO("descreva o que o método deve fazer")
+       - Se precisar inicializar no construtor, use um bloco init contendo apenas: // TODO: inicialize os atributos
+       - Use herança ('open class' / 'override'), enum class, MutableMap, exceções etc. SOMENTE se o enunciado exigir.
+       - NÃO escreva nenhuma lógica real nas classes.
+
+    2. FUNÇÃO main (completamente implementada, SIGA ESTAS REGRAS EXATAMENTE):
+    {REGRAS_MAIN}
+
+    O exemplo abaixo serve APENAS para mostrar o FORMATO do arquivo (adapte classes e comandos ao contexto
+    "{contexto_usuario}"; NÃO copie o domínio da questão animal):
+    {SHELL_ESQUELETO_EXEMPLO}
+
+    Use EXATAMENTE este marcador:
+
+    <<<SHELL>>>
+    (conteúdo completo do main.kt)
+    <<<END>>>""",
+        expected_output='Um bloco <<<SHELL>>> com o main.kt completo (esqueleto) fechado com <<<END>>>.',
+        agent=especialista_poo
+    )
+
+    # ─── execucao da geracao de questoes ────────────────────────────────────────────
+
+    equipe = Crew(
+        agents=[designer_criativo, especialista_poo],
+        tasks=[tarefa_rascunho, tarefa_arquivos, tarefa_shell],
+        process=Process.sequential
+    )
+
+    print("\nGerando questão...\n")
+    if not kickoff_seguro(equipe, "geração do rascunho inicial"):
+        raise SystemExit(1)
+
+    saida_arquivos = str(tarefa_arquivos.output) if tarefa_arquivos.output else ""
+    saida_shell    = str(tarefa_shell.output) if tarefa_shell.output else ""
+
+    readme_atual = extrair_bloco(saida_arquivos, "README")
+    shell_atual  = extrair_codigo(saida_shell, "SHELL")
+
+    if not (readme_atual and shell_atual and extrair_testes_readme(readme_atual)):
+        print("\nFaltou algum bloco (README, SHELL) ou o README não tem casos de teste válidos.")
+        print("\n--- Saída bruta (README) ---\n" + saida_arquivos)
+        print("\n--- Saída bruta (SHELL) ---\n" + saida_shell)
+        raise SystemExit(1)
 
 
-# ─── ciclo de auditoria e correção ───────────────────────────────────────────
-# a cada tentativa: gera a solução a partir do esqueleto, compila e executa contra os testes do README.
-# se falhar, manda o diagnóstico pro especialista_poo corrigir, e tenta de novo.
+    # ─── ciclo de auditoria e correção ───────────────────────────────────────────
+    # a cada tentativa: gera a solução a partir do esqueleto, compila e executa contra os testes do README.
+    # se falhar, manda o diagnóstico pro especialista_poo corrigir, e tenta de novo.
 
-aprovado = False
-gabarito_atual = ""
-diagnostico = ""
+    aprovado = False
+    gabarito_atual = ""
+    diagnostico = ""
 
-for tentativa in range(1, MAX_TENTATIVAS + 1):
-    print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
+    for tentativa in range(1, MAX_TENTATIVAS + 1):
+        print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
 
-    if "TODO" not in shell_atual:
-        # o esqueleto veio com a lógica pronta: não há nada para o aluno implementar
-        diagnostico = ("O main.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
-                       "apenas TODO(\"...\") no corpo; só a função main fica completa.")
-        gabarito_atual = ""
-    else:
-        crew_auditoria = Crew(agents=[auditor_tecnico],
-                              tasks=[criar_tarefa_gabarito(readme_atual, shell_atual)],
-                              process=Process.sequential)
-        tarefa_gabarito = crew_auditoria.tasks[0]
-        if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
-            diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
+        if "TODO" not in shell_atual:
+            # o esqueleto veio com a lógica pronta: não há nada para o aluno implementar
+            diagnostico = ("O main.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
+                           "apenas TODO(\"...\") no corpo; só a função main fica completa.")
+            gabarito_atual = ""
+        else:
+            crew_auditoria = Crew(agents=[auditor_tecnico],
+                                  tasks=[criar_tarefa_gabarito(readme_atual, shell_atual)],
+                                  process=Process.sequential)
+            tarefa_gabarito = crew_auditoria.tasks[0]
+            if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
+                diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
+                break
+
+            saida_auditor = str(tarefa_gabarito.output) if tarefa_gabarito.output else ""
+            gabarito_atual = extrair_codigo(saida_auditor, "GABARITO")
+
+            if not gabarito_atual:
+                print("Auditor não retornou um bloco <<<GABARITO>>> válido. Início da resposta recebida:")
+                print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
+                diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+            else:
+                print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
+                resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
+                diagnostico = formatar_relatorio(resultado)
+
+                if resultado["etapa"] == "ambiente":
+                    print(f"⚠ {resultado['detalhe']}")
+                    print("Auditoria automática indisponível; salvando a questão sem validação.")
+                    break
+
+                if resultado["sucesso"]:
+                    print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
+                    aprovado = True
+                    break
+
+        print(f"✗ Falhas detectadas:\n{diagnostico}")
+
+        if tentativa == MAX_TENTATIVAS:
+            print("\nLimite de tentativas atingido sem consistência técnica total.")
             break
 
-        saida_auditor = str(tarefa_gabarito.output) if tarefa_gabarito.output else ""
-        gabarito_atual = extrair_codigo(saida_auditor, "GABARITO")
+        print("Enviando relatório de diagnóstico ao Especialista para correção...")
+        tarefa_correcao = criar_tarefa_correcao(readme_atual, shell_atual, diagnostico,
+                                                contexto_usuario, exemplos, topicos_txt)
+        crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
+        if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
+            break
 
-        if not gabarito_atual:
-            print("Auditor não retornou um bloco <<<GABARITO>>> válido. Início da resposta recebida:")
-            print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
-            diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+        saida_correcao = str(tarefa_correcao.output) if tarefa_correcao.output else ""
+        novo_readme = extrair_bloco(saida_correcao, "README")
+        novo_shell  = extrair_codigo(saida_correcao, "SHELL")
+
+        if novo_readme and novo_shell and extrair_testes_readme(novo_readme):
+            readme_atual, shell_atual = novo_readme, novo_shell
         else:
-            print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
-            resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
-            diagnostico = formatar_relatorio(resultado)
-
-            if resultado["etapa"] == "ambiente":
-                print(f"⚠ {resultado['detalhe']}")
-                print("Auditoria automática indisponível; salvando a questão sem validação.")
-                break
-
-            if resultado["sucesso"]:
-                print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
-                aprovado = True
-                break
-
-    print(f"✗ Falhas detectadas:\n{diagnostico}")
-
-    if tentativa == MAX_TENTATIVAS:
-        print("\nLimite de tentativas atingido sem consistência técnica total.")
-        break
-
-    print("Enviando relatório de diagnóstico ao Especialista para correção...")
-    tarefa_correcao = criar_tarefa_correcao(readme_atual, shell_atual, diagnostico,
-                                            contexto_usuario, exemplos, topicos_txt)
-    crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
-    if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
-        break
-
-    saida_correcao = str(tarefa_correcao.output) if tarefa_correcao.output else ""
-    novo_readme = extrair_bloco(saida_correcao, "README")
-    novo_shell  = extrair_codigo(saida_correcao, "SHELL")
-
-    if novo_readme and novo_shell and extrair_testes_readme(novo_readme):
-        readme_atual, shell_atual = novo_readme, novo_shell
-    else:
-        print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
+            print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
 
 
-# ─── salvamento (só no final, depois do ciclo) ───────────────────────────────
+    # ─── salvamento (só no final, depois do ciclo) ───────────────────────────────
 
-status = (
-    "APROVADA na auditoria técnica"
-    if aprovado
-    else f"NÃO validada após {MAX_TENTATIVAS} tentativas (recomenda-se revisão manual)"
-)
-print(f"\nStatus final da questão: {status}")
+    status = (
+        "APROVADA na auditoria técnica"
+        if aprovado
+        else f"NÃO validada após {MAX_TENTATIVAS} tentativas (recomenda-se revisão manual)"
+    )
+    print(f"\nStatus final da questão: {status}")
 
-salvar_questao(OUTPUT_DIR, nome_questao, readme_atual, gabarito_atual, shell_atual)
+    salvar_questao(OUTPUT_DIR, nome_questao, readme_atual, gabarito_atual, shell_atual, entrada_usuario)
 
-if not aprovado:
-    log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
-    log_path.write_text(diagnostico, encoding="utf-8")
-    print(f"✗ Diagnóstico final salvo em: {log_path}")
+    if not aprovado:
+        log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
+        log_path.write_text(diagnostico, encoding="utf-8")
+        print(f"✗ Diagnóstico final salvo em: {log_path}")
+
+
+if __name__ == "__main__":
+    main()

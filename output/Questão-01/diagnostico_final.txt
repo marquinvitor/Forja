@@ -1,2 +1,0 @@
-Etapa com falha: ambiente
-kotlinc/java não encontrados no PATH. Instale com SDKMAN: 'sdk install kotlin' (e um JDK).

@@ -28,7 +28,7 @@ Os agentes utilizam modelos Gemini (gemini-3.5-flash-lite para rascunho e audito
 
 ## Tópicos de POO suportados
 
-O módulo topicos_poo.py identifica automaticamente os tópicos necessários com base na sua descrição, ou permite configurá-los manualmente:
+O módulo `src/topicos_poo.py` identifica automaticamente os tópicos necessários com base na sua descrição, ou permite configurá-los manualmente:
 
 - Classes e Objetos
 - Encapsulamento e Invariantes
@@ -41,7 +41,7 @@ O módulo topicos_poo.py identifica automaticamente os tópicos necessários com
 - Índices e Redundância
 - Polimorfismo
 
-O sistema consulta exemplos reais das questões presentes na pasta base do repositório arcade e utiliza os padrões catalogados em padroes.json para garantir conformidade técnica com o estilo do repositório (classes de domínio puras sem prints, mensagens em inglês na função main, comandos prefixados com cifrão nos testes, tipos explícitos).
+O sistema consulta exemplos reais das questões presentes na pasta base do repositório arcade e utiliza os padrões catalogados em `data/padroes.json` para garantir conformidade técnica com o estilo do repositório (classes de domínio puras sem prints, mensagens em inglês na função main, comandos prefixados com cifrão nos testes, tipos explícitos).
 
 ---
 
@@ -127,13 +127,13 @@ Execute o script principal:
 Com uv:
 
 ```bash
-uv run Forja.py
+uv run src/forja.py
 ```
 
 Com venv ativo:
 
 ```bash
-python Forja.py
+python src/forja.py
 ```
 
 O terminal solicitará:
@@ -165,7 +165,7 @@ output/nome_da_questao/
 
 ## Estrutura do projeto
 
-- Forja.py: ponto de entrada da aplicação, orquestração dos agentes CrewAI, tarefas, integração com LiteLLM, salvamento do esqueleto (shell.kt) e da solução (main.kt), e ciclo de auditoria com compilação kotlinc e execução java.
-- topicos_poo.py: regras de detecção de tópicos de POO, extração de código e leitura de padrões do repositório arcade local.
-- padroes.json: catálogo de boas práticas e convenções observadas em cada tópico de POO.
-- pyproject.toml e uv.lock: definição e travamento determinístico de dependências do projeto.
+- `src/forja.py`: ponto de entrada da aplicação, orquestração dos agentes CrewAI, tarefas, integração com LiteLLM, salvamento do esqueleto (shell.kt) e da solução (main.kt), e ciclo de auditoria com compilação kotlinc e execução java.
+- `src/topicos_poo.py`: regras de detecção de tópicos de POO, extração de código e leitura de padrões do repositório arcade local.
+- `data/padroes.json`: catálogo de boas práticas e convenções observadas em cada tópico de POO.
+- `pyproject.toml` e `uv.lock`: definição e travamento determinístico de dependências do projeto.

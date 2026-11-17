@@ -6,11 +6,10 @@ Ideia: o sistema aprende "como o professor aplica cada tópico" olhando as quest
   1. TOPICOS: índice tópico -> questões-exemplo do repositório (edite à vontade).
   2. detectar_topicos(): descrição natural -> ids de tópicos (palavras-chave + LLM opcional).
   3. obter_padrao(): o LLM lê o exemplo real e resume como o tópico foi aplicado.
-     O resultado é salvo em padroes.json -> revise/corrija esse arquivo à mão.
+     O resultado é salvo em data/padroes.json -> revise/corrija esse arquivo à mão.
   4. preparar(): devolve o texto de contexto pronto para injetar nos prompts.
 """
 from __future__ import annotations
-
 import json
 import re
 import unicodedata
@@ -88,7 +87,13 @@ ORDEM_LINGUAGENS = [".kt", ".java", ".ts", ".py"]   # preferência ao escolher a
 SUFIXOS_CODIGO = set(ORDEM_LINGUAGENS)
 DICAS_SOLUCAO = ("solution", "solucao", "gabarito", "shell", "main")
 
-PADROES_JSON = Path(__file__).with_name("padroes.json")
+# Caminho do catálogo/cache de padrões: data/padroes.json na raiz do projeto
+_RAIZ_PROJETO = Path(__file__).resolve().parent.parent
+PADROES_JSON = _RAIZ_PROJETO / "data" / "padroes.json"
+if not PADROES_JSON.exists():
+    _fallback_local = Path(__file__).resolve().parent / "padroes.json"
+    if _fallback_local.exists():
+        PADROES_JSON = _fallback_local
 
 
 def _norm(t: str) -> str:
@@ -184,7 +189,7 @@ def obter_padrao(topico: str, slug: str, exemplo: str, chamar_llm: Optional[Call
     if chamar_llm is None:
         return ""
     print(f"  → resumindo o exemplo '{slug}' ({TOPICOS[topico]['titulo']}); "
-          f"só na 1ª vez, depois fica salvo em padroes.json...")
+          f"só na 1ª vez, depois fica salvo em data/padroes.json...")
 
     prompt = f"""Você analisa uma questão de POO de um repositório didático.
 Tópico a observar: {TOPICOS[topico]['titulo']}.
@@ -202,6 +207,7 @@ Seja específico a esta questão, sem teoria genérica. Responda só com as linh
     print("    ✓ resumo pronto" if padrao else "    ⚠ resposta vazia do modelo (verifique servidor/modelo no LM Studio)")
     if padrao:
         cache[chave] = padrao
+        PADROES_JSON.parent.mkdir(parents=True, exist_ok=True)
         PADROES_JSON.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
     return padrao
 
