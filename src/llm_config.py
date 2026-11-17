@@ -1,6 +1,7 @@
 """Configuração dos modelos usados pelos agentes da Forja."""
 
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -41,7 +42,7 @@ def carregar_configuracao(settings: Mapping[str, Any]) -> ConfiguracaoLLM:
 
     nome_chave = f"{provedor}_api_key"
     nome_arquivo = f"{provedor}_api_key_file"
-    api_key = str(settings.get(nome_chave) or "").strip()
+    api_key = str(settings.get(nome_chave) or os.environ.get(nome_chave.upper()) or "").strip()
     arquivo_chave = str(settings.get(nome_arquivo) or "").strip()
     if arquivo_chave:
         caminho = Path(arquivo_chave).expanduser()

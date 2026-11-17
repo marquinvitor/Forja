@@ -63,6 +63,11 @@ class ConfiguracaoLLMTest(unittest.TestCase):
             env["openai_api_key"] = "chave-direta"
             self.assertEqual(carregar_configuracao(env).api_key, "chave-do-arquivo")
 
+    def test_chave_pode_vir_de_secret_do_ambiente(self):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "secret-codespace"}, clear=False):
+            config = carregar_configuracao({"llm_provider": "openai"})
+        self.assertEqual(config.api_key, "secret-codespace")
+
     def test_arquivo_de_chave_invalido_falha_com_mensagem_clara(self):
         with self.assertRaisesRegex(ValueError, "openai_api_key_file"):
             carregar_configuracao({

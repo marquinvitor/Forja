@@ -1,0 +1,19 @@
+{
+  "name": "Forja",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "uv sync",
+  "postStartCommand": "python -m py_compile src/*.py",
+  "forwardPorts": [8765],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "fwcd.kotlin",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}

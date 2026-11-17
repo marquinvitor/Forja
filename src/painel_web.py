@@ -32,6 +32,7 @@ from persistencia import (
 from projetos import atualizar_projeto, listar_projetos, registrar_projeto
 from repositorio import caminho_repositorio_automatico
 from terminais import abrir_acompanhamento, detectar_terminais
+from topicos_poo import TOPICOS
 
 
 HTML_PATH = Path(__file__).with_name("forja_panel.html")
@@ -57,8 +58,12 @@ def _iniciar_projeto(settings_path: Path, payload: dict[str, Any]) -> dict[str, 
         raise ValueError(f"Já existe um projeto em {projeto_path}.")
     environment = _environment(settings, settings_path)
     topics_input = payload.get("topics_input")
+    topics = payload.get("topics", [])
+    if not isinstance(topics, list) or any(not isinstance(item, str) for item in topics):
+        raise ValueError("topics deve ser uma lista de IDs de tópicos.")
+    topics = [item for item in topics if item in TOPICOS]
     if topics_input is None:
-        topics_input = ""
+        topics_input = ", ".join(topics)
     if not isinstance(topics_input, str):
         raise ValueError("topics_input deve ser texto.")
     max_attempts = payload.get("max_attempts", 3)
@@ -66,14 +71,14 @@ def _iniciar_projeto(settings_path: Path, payload: dict[str, Any]) -> dict[str, 
         raise ValueError("max_attempts deve ser um número entre 1 e 10.")
     projeto = registrar_projeto(
         nome, projeto_path, descricao, provider=environment["provider"],
-        models=environment["models"], topics_input=topics_input,
+        models=environment["models"], topics=topics, topics_input=topics_input,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     comando = [sys.executable, "-u", str(Path(__file__).with_name("forja.py")),
                "--settings", str(settings_path.parent), "--description", descricao,
                "--name", nome, "--yes"]
-    if topics_input:
-        comando.extend(["--topics-input", topics_input])
+    if topics:
+        comando.extend(["--topics", ",".join(topics)])
     comando.extend(["--max-attempts", str(max_attempts)])
     if payload.get("generate_cover") and environment["provider"] == "openai":
         comando.append("--cover")
@@ -129,6 +134,7 @@ def _key_status(settings: dict[str, Any], provider: str) -> dict[str, Any]:
     direct_name = f"{provider}_api_key"
     file_name = f"{provider}_api_key_file"
     direct = str(settings.get(direct_name) or "").strip()
+    environment = str(os.environ.get(direct_name.upper()) or "").strip()
     file_value = str(settings.get(file_name) or "").strip()
     file_path = Path(file_value).expanduser() if file_value else None
     file_configured = False
@@ -137,9 +143,9 @@ def _key_status(settings: dict[str, Any], provider: str) -> dict[str, Any]:
             file_configured = bool(file_path.read_text(encoding="utf-8").strip())
         except OSError:
             file_configured = False
-    source = "direct" if direct else "file" if file_configured else "none"
+    source = "direct" if direct else "environment" if environment else "file" if file_configured else "none"
     return {
-        "configured": bool(direct or file_configured),
+        "configured": bool(direct or environment or file_configured),
         "source": source,
         "file_path": file_value,
     }
@@ -174,6 +180,7 @@ def _environment(settings: dict[str, Any], settings_path: Path) -> dict[str, Any
         "terminal_name": settings.get("terminal_name") or "auto",
         "open_terminal_on_project": bool(settings.get("open_terminal_on_project")),
         "terminals": detectar_terminais(),
+        "topics_options": [{"id": key, "title": value["titulo"]} for key, value in TOPICOS.items()],
         "output_dir": resolver_output_dir(settings),
         "default_output_dir": str(diretorio_dados()),
     }

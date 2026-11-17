@@ -75,6 +75,19 @@ sdk install kotlin
 
 ## Instalação
 
+### GitHub Codespaces
+
+Ao criar um Codespace, a configuração em `.devcontainer/` instala automaticamente Python 3.12, uv, JDK 17, Kotlin e as dependências do projeto. O setup é executado por `postCreateCommand` com `uv sync`.
+
+As chaves não devem ser colocadas no repositório, em `.env`, em `settings.json` ou no cache. No GitHub, crie Secrets em **Settings → Secrets and variables → Codespaces** e use os nomes:
+
+```text
+OPENAI_API_KEY
+GEMINI_API_KEY
+```
+
+O Forja lê essas variáveis automaticamente. O `.cache` fica fora do workspace e não é enviado pelo Git, mas não é um cofre: processos dentro do Codespace podem ler esse diretório e o ambiente pode ser persistido. Use Codespaces Secrets para credenciais.
+
 Clone o repositório e acesse a pasta:
 
 ```bash
