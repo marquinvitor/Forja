@@ -1,1 +1,1 @@
-3 classes, com encapsulamento, mapas e exceções, no contexto de uma biblioteca de bairro que empresta livros para sócios, com limite de empréstimos por sócio e livros que podem estar indisponíveis
+2 classes, com agregação e delegação, no contexto de um sistema de patinetes elétricos onde um patinete agrega opcionalmente um usuário para realizar corridas por tempo determinado

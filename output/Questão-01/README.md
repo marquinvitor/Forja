@@ -1,10 +1,10 @@
 ---
 index_content: |2
-    - Descrição: Sistema para gerenciamento de revisões de bicicletas urbanas e elétricas em uma oficina mecânica.
-    - Domínio: Gestão de oficina com cobrança polimórfica de serviços por tipo de bicicleta.
-    - Objetivos: Praticar herança, polimorfismo, encapsulamento com invariantes e uso de mapas.
+    - Descrição: Implementar uma classe que represente uma garrafa térmica inteligente com encapsulamento de capacidade, volume e temperatura.
+    - Domínio: Dispositivos inteligentes (IoT) e controle de fluidos.
+    - Objetivos: Praticar encapsulamento, proteção de invariantes de classe e separação de lógica de domínio e interface.
 ---
-# [TRAIN] Oficina de Bicicletas
+# [TRAIN] Garrafa Térmica Inteligente
 
 <!-- toc-table -->
 
@@ -12,57 +12,44 @@ index_content: |2
 
 ## Intro
 
-Em meio ao trânsito caótico da metrópole, Carlos abriu a *CicloTech*, uma oficina especializada em atender desde ciclistas urbanos tradicionais até adeptos das modernas bicicletas elétricas. No início, o controle das ordens de serviço era feito em um caderno amassado, mas logo surgiram problemas: revisões de e-bikes cobradas com preço de urbana causavam prejuízos com manutenção de motores potentes, enquanto clientes reclamavam de quilometragens anotadas com valores negativos por distração dos mecânicos.
+Na startup *ThermoTech Solutions*, a engenheira Mariana e o desenvolvedor Carlos foram encarregados de criar o firmware da **SmartBottle 3000**, uma garrafa térmica inteligente conectada. No último teste de laboratório, um erro grotesco no software antigo permitiu que o usuário solicitasse um enchimento além da capacidade física do recipiente, resultando em um vazamento que quase queimou a placa controladora. Para piorar, leituras corrompidas de sensores enviavam volumes negativos, deixando o painel completamente dessincronizado.
 
-Para profissionalizar o negócio, Carlos decidiu encomendar um sistema orientado a objetos robusto. Cada bicicleta que entra na oficina recebe uma identificação única e tem sua quilometragem registrada sob rigoroso controle de invariante. Além disso, a cobrança da revisão é calculada de forma polimórfica: bicicletas urbanas pagam uma taxa fixa simples acrescida por quilômetro rodado, enquanto bicicletas elétricas consideram também a potência do motor para cobrir o desgaste elétrico.
+Mariana definiu a tarefa: Carlos precisa recriar o núcleo lógico da garrafa utilizando **Programação Orientada a Objetos com Encapsulamento estrito**. Os atributos de capacidade, volume e temperatura não devem ser manipulados diretamente por agentes externos. O objeto deve garantir suas **invariantes** a todo custo: o volume nunca pode ser negativo nem ultrapassar a capacidade máxima, e a temperatura não pode assumir valores inconsistentes.
 
-O sistema é composto pelas seguintes classes e responsabilidades:
+### Atributos e Estrutura
 
-1. **`Bicicleta`** (Classe Abstrata):
-   - Atributos:
-     - `codigo` (`String`): Identificador único da bicicleta.
-     - `quilometragem` (`Int`): Distância percorrida em quilômetros (deve ser $\ge 0$).
-   - Construtor: Inicializa `codigo` e `quilometragem`.
-   - Métodos:
-     - `getCodigo(): String`: Retorna o código identificador.
-     - `getQuilometragem(): Int`: Retorna a quilometragem atual.
-     - `setQuilometragem(km: Int): Boolean`: Atualiza a quilometragem apenas se $km \ge 0$, retornando `true` em sucesso e `false` se o valor for inválido, preservando o estado anterior.
-     - `calcularRevisao(): Double` (abstrato): Calcula o custo total da revisão.
+- **ThermalBottle**:
+  - `capacity` (Int, privado): capacidade máxima suportada em mililitros (mL).
+  - `volume` (Int, privado): quantidade atual de líquido armazenada em mL.
+  - `temperature` (Int, privado): temperatura atual do líquido em graus Celsius (°C).
+- **Construtor**:
+  - `ThermalBottle(capacity: Int)`: inicializa a garrafa com a capacidade fornecida. Inicialmente, o volume é `0` e a temperatura é `0`.
+- **Métodos**:
+  - `getCapacity(): Int`: retorna a capacidade máxima.
+  - `getVolume(): Int`: retorna o volume de líquido atual.
+  - `getTemperature(): Int`: retorna a temperatura atual.
+  - `fill(volume: Int, temperature: Int): Boolean`: adiciona o volume informado e define a nova temperatura se a operação for válida (sem ultrapassar a capacidade e sem parâmetros negativos). Retorna `true` se abasteceu com sucesso, ou `false` se os dados forem inválidos ou causarem transbordamento.
+  - `serve(volume: Int): Boolean`: retira o volume informado da garrafa. Retorna `true` em caso de sucesso ou `false` se o volume for negativo ou superior ao volume existente.
 
-2. **`BicicletaUrbana`** (Subclasse de `Bicicleta`):
-   - Construtor: Recebe `codigo` e `quilometragem`.
-   - Métodos:
-     - `calcularRevisao(): Double`: Retorna a taxa base de R$ 50.00 mais R$ 0.10 por quilômetro rodado.
-     - `toString(): String`: Retorna a representação formatada no padrão:  
-       `"urbana: <codigo>, km: <quilometragem>, cost: <calcularRevisao()>"`
+### Comandos do Shell
 
-3. **`BicicletaEletrica`** (Subclasse de `Bicicleta`):
-   - Atributos adicionais:
-     - `potencia` (`Int`): Potência do motor em Watts.
-   - Construtor: Recebe `codigo`, `quilometragem` e `potencia`.
-   - Métodos:
-     - `getPotencia(): Int`: Retorna a potência do motor.
-     - `calcularRevisao(): Double`: Retorna a taxa base de R$ 100.00 mais R$ 0.20 por quilômetro rodado, acrescido de uma taxa extra de R$ 50.00 caso a potência seja estritamente superior a 250W.
-     - `toString(): String`: Retorna a representação formatada no padrão:  
-       `"eletrica: <codigo>, km: <quilometragem>, potencia: <potencia>W, cost: <calcularRevisao()>"`
+O programa lê comandos em loop a partir da entrada padrão:
 
-4. **`Oficina`** (Classe de Gerenciamento):
-   - Atributos:
-     - `bicicletas` (`Map<String, Bicicleta>`): Armazena as bicicletas cadastradas tendo o código como chave. Recomenda-se o uso de mapa ordenado (`sortedMapOf` ou ordenação por chave na listagem) para garantir saída consistente.
-   - Métodos:
-     - `adicionarBicicleta(bike: Bicicleta): Boolean`: Insere a bicicleta no mapa se o código ainda não existir, retornando `true`; se já existir, retorna `false`.
-     - `buscarBicicleta(codigo: String): Bicicleta?`: Retorna a bicicleta associada ao código ou `null` caso não encontrada.
-     - `obterTodas(): List<Bicicleta>`: Retorna a lista com todas as bicicletas cadastradas ordenadas alfabeticamente pelo código.
+- `init <capacity>`: cria uma nova garrafa térmica com a capacidade informada. Se a capacidade for menor ou igual a zero, exibe `fail: capacity must be positive`.
+- `show`: exibe o estado atual da garrafa no formato: `capacity: C, volume: V, temperature: T`.
+- `fill <volume> <temperature>`: abastece a garrafa. Em caso de parâmetro negativo, exibe `fail: negative value`. Em caso de volume excedente à capacidade disponível, exibe `fail: overflow`.
+- `serve <volume>`: retira líquido da garrafa. Se o volume for negativo, exibe `fail: negative value`. Se o volume solicitado for maior que o volume disponível, exibe `fail: not enough water`.
+- `end`: encerra o programa.
 
 ## Regras
 
-- O código da bicicleta é a chave única no mapa da oficina; cadastrar um código já existente deve falhar e o sistema deve exibir `fail: bike already exists`.
-- A quilometragem de uma bicicleta não pode ser negativa; chamadas a `setQuilometragem` com valor menor que 0 devem falhar retornando `false` e mantendo inalterado o valor anterior.
-- Bicicletas urbanas cobram taxa base de R$ 50.00 acrescida de R$ 0.10 por km rodado.
-- Bicicletas elétricas cobram taxa base de R$ 100.00 mais R$ 0.20 por km rodado, além de um adicional de R$ 50.00 se a potência for maior que 250W.
-- Operações de busca ou alteração em bicicletas inexistentes no mapa devem exibir `fail: bike not found`.
-- O comando de listagem geral em uma oficina sem bicicletas cadastradas deve exibir `fail: empty workshop`.
-- As classes de domínio nunca realizam saídas de texto diretamente (`println`); elas retornam valores (`Boolean`, objetos, `null`) para que o `Main` faça o tratamento e exibição.
+- A capacidade informada na criação da garrafa deve ser estritamente maior que zero (`capacity > 0`).
+- O volume atual nunca pode ser menor que zero nem maior que a capacidade (`0 <= volume <= capacity`).
+- Ao abastecer (`fill`), valores negativos para volume ou temperatura devem ser rejeitados e não alteram o estado da garrafa.
+- Se uma tentativa de abastecer resultar em transbordamento (`volume + atual > capacity`), a operação deve ser cancelada integralmente, preservando o volume e a temperatura anteriores.
+- Ao servir (`serve`), valores negativos devem ser rejeitados. Se não houver água suficiente para a dose solicitada, nenhuma quantidade de água deve ser retirada.
+- Se o volume esvaziar totalmente (`volume == 0`), a temperatura é resetada para `0`.
+- As classes do domínio (`ThermalBottle`) não devem conter comandos de impressão (`println`); o controle de exibição de erros (`fail: ...`) pertence à camada Shell/Main.
 
 ## Diagrama
 
@@ -71,122 +58,116 @@ O sistema é composto pelas seguintes classes e responsabilidades:
 classDiagram
     direction TB
 
-    class Bicicleta {
-        <<abstract>>
-        -codigo : String
-        -quilometragem : Int
-        +getCodigo() String
-        +getQuilometragem() Int
-        +setQuilometragem(km : Int) Boolean
-        +calcularRevisao()* Double
-        +toString() String
-    }
-
-    class BicicletaUrbana {
-        +calcularRevisao() Double
-        +toString() String
-    }
-
-    class BicicletaEletrica {
-        -potencia : Int
-        +getPotencia() Int
-        +calcularRevisao() Double
-        +toString() String
-    }
-
-    class Oficina {
-        -bicicletas : Map~String, Bicicleta~
-        +adicionarBicicleta(bike : Bicicleta) Boolean
-        +buscarBicicleta(codigo : String) Bicicleta
-        +obterTodas() List~Bicicleta~
+    class ThermalBottle {
+        -capacity : Int
+        -volume : Int
+        -temperature : Int
+        +getCapacity() Int
+        +getVolume() Int
+        +getTemperature() Int
+        +fill(volume : Int, temperature : Int) Boolean
+        +serve(volume : Int) Boolean
     }
 
     class Main {
-        +main(args : Array~String~) Unit
+        +main() Unit
     }
 
-    Bicicleta <|-- BicicletaUrbana
-    Bicicleta <|-- BicicletaEletrica
-    Oficina "1" o-- "*" Bicicleta : gerencia
-    Main ..> Oficina : interage
+    Main ..> ThermalBottle : creates and uses
 ```
 
 ## Guide
 
-* Comece criando a classe abstrata `Bicicleta`. Garanta que o atributo `quilometragem` seja privado e que o método `setQuilometragem(km: Int): Boolean` valide a invariante ($km \ge 0$), retornando `false` sem alterar o valor em caso de entrada negativa.
-* Implemente as classes `BicicletaUrbana` e `BicicletaEletrica` estendendo `Bicicleta`. Sobrescreva `calcularRevisao(): Double` aplicando as regras de precificação de cada modalidade e implemente o método `toString()` de cada uma conforme a especificação.
-* Crie a classe `Oficina` encapsulando uma coleção do tipo `Map<String, Bicicleta>`. Implemente os métodos de inserção verificando a existência da chave (`containsKey`), de busca direta e de recuperação de todas as bicicletas com ordenação pela chave.
-* Monte a função `main` processando os comandos a partir da entrada padrão (`Scanner` ou `readLine`). Trate os retornos dos métodos da oficina e imprima as mensagens de sucesso ou falha correspondentes.
+* **Passo 1 (Encapsulamento e Estado Inicial):** Crie a classe `ThermalBottle` com propriedades privadas `capacity`, `volume` e `temperature`. No construtor, assegure-se de que a capacidade seja positiva (caso use exceções ou validação prévia na Main). Disponibilize os métodos getters para leitura dos atributos.
+* **Passo 2 (Operação de Abastecimento - Invariante de Transbordamento):** Implemente `fill(volume: Int, temperature: Int): Boolean`. Verifique primeiro se algum parâmetro é negativo. Em seguida, verifique se `this.volume + volume > this.capacity`. Se qualquer condição falhar, mantenha o estado anterior intacto e retorne `false`. Caso contrário, atualize `this.volume` e `this.temperature` e retorne `true`.
+* **Passo 3 (Operação de Servir - Invariante de Não Negatividade):** Implemente `serve(volume: Int): Boolean`. Garanta que `volume >= 0` e que `volume <= this.volume`. Se válido, subtraia o volume. Se a garrafa ficar completamente vazia (`this.volume == 0`), zere a temperatura. Retorne `true` ou `false` conforme o sucesso da operação.
+* **Passo 4 (Shell e Tratamento de Erros):** Na função `main`, instancie o objeto e monte o loop de comandos. Lembre-se de mapear as razões de falha e imprimir as mensagens `fail: ...` adequadas antes ou após a interação com o domínio, mantendo a classe `ThermalBottle` livre de chamadas de console.
 
 Perguntas de reflexão:
-- Por que delegar a responsabilidade do cálculo de revisão para cada subclasse (`BicicletaUrbana` e `BicicletaEletrica`) através do polimorfismo é superior a verificar o tipo da bicicleta com operadores como `is` ou `when` dentro da classe `Oficina`?
-- Como o retorno booleano no setter `setQuilometragem` auxilia a camada de apresentação (`Main`) a comunicar erros sem que o domínio precise acoplar dependências de saída (`System.out`)?
+1. Por que manter o estado inalterado em caso de transbordamento (atomicidade da operação) é crucial para sistemas embarcados?
+2. Como o uso de visibilidade privada (`private`) nos atributos impede que código cliente quebre regras de negócio fundamentais da garrafa?
 
 ## Shell
 
 ```bash
-#TEST_CASE cadastro_e_unicidade
+#TEST_CASE inicializacao_e_show
 
-$add_urbana b1 1200
-success
-$add_eletrica b2 500 350
-success
-$add_urbana b1 200
-fail: bike already exists
+$init 1000
+$show
+capacity: 1000, volume: 0, temperature: 0
 $end
 ```
 
 ```bash
-#TEST_CASE encapsulamento_e_invariante
+#TEST_CASE capacidade_invalida
 
-$add_urbana b1 1000
-success
-$set_km b1 -50
-fail: invalid km
-$set_km b1 1500
-success
-$show b1
-urbana: b1, km: 1500, cost: 200.0
+$init 0
+fail: capacity must be positive
+$init -500
+fail: capacity must be positive
 $end
 ```
 
 ```bash
-#TEST_CASE revisao_polimorfica_eletrica
+#TEST_CASE abastecimento_valido
 
-$add_eletrica e1 200 300
-success
-$show e1
-eletrica: e1, km: 200, potencia: 300W, cost: 190.0
-$add_eletrica e2 200 250
-success
-$show e2
-eletrica: e2, km: 200, potencia: 250W, cost: 140.0
+$init 1000
+$fill 500 85
+$show
+capacity: 1000, volume: 500, temperature: 85
+$fill 300 70
+$show
+capacity: 1000, volume: 800, temperature: 70
 $end
 ```
 
 ```bash
-#TEST_CASE elementos_inexistentes
+#TEST_CASE falhas_de_abastecimento
 
-$show b99
-fail: bike not found
-$set_km b99 100
-fail: bike not found
+$init 1000
+$fill -50 80
+fail: negative value
+$fill 500 -10
+fail: negative value
+$fill 1200 90
+fail: overflow
+$show
+capacity: 1000, volume: 0, temperature: 0
 $end
 ```
 
 ```bash
-#TEST_CASE listagem_geral_e_oficina_vazia
+#TEST_CASE servir_liquido_e_limites
 
-$show_all
-fail: empty workshop
-$add_urbana u1 100
-success
-$add_eletrica e1 400 250
-success
-$show_all
-eletrica: e1, km: 400, potencia: 250W, cost: 180.0
-urbana: u1, km: 100, cost: 60.0
+$init 1000
+$fill 600 90
+$serve -30
+fail: negative value
+$serve 700
+fail: not enough water
+$show
+capacity: 1000, volume: 600, temperature: 90
+$serve 600
+$show
+capacity: 1000, volume: 0, temperature: 0
 $end
 ```
 
-<!-- MERMAID -->
+```bash
+#TEST_CASE sequencia_completa
+
+$init 500
+$fill 500 95
+$show
+capacity: 500, volume: 500, temperature: 95
+$fill 1 95
+fail: overflow
+$serve 250
+$show
+capacity: 500, volume: 250, temperature: 95
+$serve 250
+$show
+capacity: 500, volume: 0, temperature: 0
+$serve 1
+fail: not enough water
+$end

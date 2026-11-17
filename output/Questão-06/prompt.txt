@@ -1,1 +1,1 @@
-3 classes, com posições fixas e ausência e encapsulamento, no contexto de um estacionamento rotativo com capacidade fixa de vagas numeradas onde cada vaga pode estar vazia ou ocupada por um veículo
+4 classes, com herança, polimorfismo, encapsulamento e mapas, no contexto de uma oficina de bicicletas que atende bicicletas urbanas e elétricas, cada tipo com uma regra diferente de cobrança de revisão

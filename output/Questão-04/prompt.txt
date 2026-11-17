@@ -1,1 +1,1 @@
-2 classes, com agregação e delegação, no contexto de um sistema de patinetes elétricos onde um patinete agrega opcionalmente um usuário para realizar corridas por tempo determinado
+3 classes, com posições fixas e ausência e encapsulamento, no contexto de um estacionamento rotativo com capacidade fixa de vagas numeradas onde cada vaga pode estar vazia ou ocupada por um veículo

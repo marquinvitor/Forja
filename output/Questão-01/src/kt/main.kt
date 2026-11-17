@@ -1,111 +1,67 @@
-const val SUCCESS_MSG: String = "success"
-const val BIKE_ALREADY_EXISTS_MSG: String = "fail: bike already exists"
-const val BIKE_NOT_FOUND_MSG: String = "fail: bike not found"
-const val INVALID_KM_MSG: String = "fail: invalid km"
-const val EMPTY_WORKSHOP_MSG: String = "fail: empty workshop"
+const val CAPACITY_MUST_BE_POSITIVE_MSG: String = "fail: capacity must be positive"
+const val NEGATIVE_VALUE_MSG: String = "fail: negative value"
+const val OVERFLOW_MSG: String = "fail: overflow"
+const val NOT_ENOUGH_WATER_MSG: String = "fail: not enough water"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
 
-abstract class Bicicleta(codigo: String, quilometragem: Int) {
-    private var codigo: String = ""
-    private var quilometragem: Int = 0
+class ThermalBottle(capacity: Int = 0) {
+    private var capacity: Int = 0
+    private var volume: Int = 0
+    private var temperature: Int = 0
 
     init {
-        this.codigo = codigo
-        if (quilometragem >= 0) {
-            this.quilometragem = quilometragem
-        } else {
-            this.quilometragem = 0
+        if (capacity > 0) {
+            this.capacity = capacity
         }
+        this.volume = 0
+        this.temperature = 0
     }
 
-    fun getCodigo(): String {
-        return this.codigo
+    fun getCapacity(): Int {
+        return this.capacity
     }
 
-    fun getQuilometragem(): Int {
-        return this.quilometragem
+    fun getVolume(): Int {
+        return this.volume
     }
 
-    fun setQuilometragem(km: Int): Boolean {
-        if (km >= 0) {
-            this.quilometragem = km
-            return true
-        }
-        return false
+    fun getTemperature(): Int {
+        return this.temperature
     }
 
-    abstract fun calcularRevisao(): Double
-
-    abstract override fun toString(): String
-}
-
-class BicicletaUrbana(codigo: String, quilometragem: Int) : Bicicleta(codigo, quilometragem) {
-    init {
-    }
-
-    override fun calcularRevisao(): Double {
-        return 50.0 + (this.getQuilometragem() * 0.10)
-    }
-
-    override fun toString(): String {
-        return "urbana: ${this.getCodigo()}, km: ${this.getQuilometragem()}, cost: ${this.calcularRevisao()}"
-    }
-}
-
-class BicicletaEletrica(codigo: String, quilometragem: Int, potencia: Int) : Bicicleta(codigo, quilometragem) {
-    private var potencia: Int = 0
-
-    init {
-        this.potencia = potencia
-    }
-
-    fun getPotencia(): Int {
-        return this.potencia
-    }
-
-    override fun calcularRevisao(): Double {
-        var custo: Double = 100.0 + (this.getQuilometragem() * 0.20)
-        if (this.potencia > 250) {
-            custo += 50.0
-        }
-        return custo
-    }
-
-    override fun toString(): String {
-        return "eletrica: ${this.getCodigo()}, km: ${this.getQuilometragem()}, potencia: ${this.potencia}W, cost: ${this.calcularRevisao()}"
-    }
-}
-
-class Oficina {
-    private val bicicletas: MutableMap<String, Bicicleta> = mutableMapOf()
-
-    fun adicionarBicicleta(bike: Bicicleta): Boolean {
-        if (this.bicicletas.containsKey(bike.getCodigo())) {
+    fun fill(volume: Int, temperature: Int): Boolean {
+        if (volume < 0 || temperature < 0) {
             return false
         }
-        this.bicicletas[bike.getCodigo()] = bike
+        if (this.volume + volume > this.capacity) {
+            return false
+        }
+        this.volume += volume
+        this.temperature = temperature
         return true
     }
 
-    fun buscarBicicleta(codigo: String): Bicicleta? {
-        return this.bicicletas[codigo]
+    fun serve(volume: Int): Boolean {
+        if (volume < 0) {
+            return false
+        }
+        if (volume > this.volume) {
+            return false
+        }
+        this.volume -= volume
+        if (this.volume == 0) {
+            this.temperature = 0
+        }
+        return true
     }
 
-    fun obterTodas(): List<Bicicleta> {
-        val chavesOrdenadas: List<String> = this.bicicletas.keys.sorted()
-        val resultado: MutableList<Bicicleta> = mutableListOf()
-        for (chave: String in chavesOrdenadas) {
-            val bike: Bicicleta? = this.bicicletas[chave]
-            if (bike != null) {
-                resultado.add(bike)
-            }
-        }
-        return resultado
+    override fun toString(): String {
+        return "capacity: ${this.capacity}, volume: ${this.volume}, temperature: ${this.temperature}"
     }
 }
 
 fun main(): Unit {
-    val oficina: Oficina = Oficina()
+    var bottle: ThermalBottle = ThermalBottle(0)
 
     while (true) {
         val line: String = readLine() ?: break
@@ -114,48 +70,30 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "add_urbana" -> {
-                val bike: BicicletaUrbana = BicicletaUrbana(parts[1], parts[2].toInt())
-                if (oficina.adicionarBicicleta(bike)) {
-                    println(SUCCESS_MSG)
+            "init" -> {
+                val capacity: Int = parts[1].toInt()
+                if (capacity <= 0) {
+                    println(CAPACITY_MUST_BE_POSITIVE_MSG)
                 } else {
-                    println(BIKE_ALREADY_EXISTS_MSG)
+                    bottle = ThermalBottle(capacity)
                 }
             }
-            "add_eletrica" -> {
-                val bike: BicicletaEletrica = BicicletaEletrica(parts[1], parts[2].toInt(), parts[3].toInt())
-                if (oficina.adicionarBicicleta(bike)) {
-                    println(SUCCESS_MSG)
-                } else {
-                    println(BIKE_ALREADY_EXISTS_MSG)
+            "show" -> println(bottle)
+            "fill" -> {
+                val volume: Int = parts[1].toInt()
+                val temperature: Int = parts[2].toInt()
+                if (volume < 0 || temperature < 0) {
+                    println(NEGATIVE_VALUE_MSG)
+                } else if (!bottle.fill(volume, temperature)) {
+                    println(OVERFLOW_MSG)
                 }
             }
-            "set_km" -> {
-                val bike: Bicicleta? = oficina.buscarBicicleta(parts[1])
-                if (bike == null) {
-                    println(BIKE_NOT_FOUND_MSG)
-                } else if (bike.setQuilometragem(parts[2].toInt())) {
-                    println(SUCCESS_MSG)
-                } else {
-                    println(INVALID_KM_MSG)
-                }
-            }
-            "show" -> {
-                val bike: Bicicleta? = oficina.buscarBicicleta(parts[1])
-                if (bike == null) {
-                    println(BIKE_NOT_FOUND_MSG)
-                } else {
-                    println(bike)
-                }
-            }
-            "show_all" -> {
-                val bikes: List<Bicicleta> = oficina.obterTodas()
-                if (bikes.isEmpty()) {
-                    println(EMPTY_WORKSHOP_MSG)
-                } else {
-                    for (bike: Bicicleta in bikes) {
-                        println(bike)
-                    }
+            "serve" -> {
+                val volume: Int = parts[1].toInt()
+                if (volume < 0) {
+                    println(NEGATIVE_VALUE_MSG)
+                } else if (!bottle.serve(volume)) {
+                    println(NOT_ENOUGH_WATER_MSG)
                 }
             }
             else -> println(INVALID_COMMAND_MSG)

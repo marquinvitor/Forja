@@ -1,151 +1,108 @@
+const val SCOOTER_BUSY_MSG: String = "fail: scooter is busy"
+const val USER_TOO_YOUNG_MSG: String = "fail: user too young"
+const val NO_USER_MSG: String = "fail: no user on scooter"
+const val BATTERY_DEPLETED_MSG: String = "fail: battery depleted"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
 
-class Livro(private val titulo: String) {
-    private var emprestado: Boolean = false
+enum class EnterResult {
+    SUCCESS,
+    BUSY,
+    TOO_YOUNG
+}
 
-    fun getTitulo(): String {
-        return this.titulo
+enum class LeaveResult {
+    SUCCESS,
+    NO_USER
+}
+
+enum class DriveResult {
+    SUCCESS,
+    NO_USER,
+    BATTERY_DEPLETED
+}
+
+class User(private val name: String, private val age: Int) {
+    companion object {
+        const val MIN_AGE: Int = 18
     }
 
-    fun isEmprestado(): Boolean {
-        return this.emprestado
+    fun getName(): String {
+        return this.name
     }
 
-    fun emprestar(): Boolean {
-        if (this.emprestado) {
-            return false
-        }
-        this.emprestado = true
-        return true
+    fun getAge(): Int {
+        return this.age
     }
 
-    fun devolver(): Boolean {
-        if (!this.emprestado) {
-            return false
-        }
-        this.emprestado = false
-        return true
+    fun canRide(): Boolean {
+        return this.age >= MIN_AGE
     }
 
     override fun toString(): String {
-        val status: String = if (this.emprestado) "emprestado" else "disponivel"
-        return "${this.titulo} [$status]"
+        return "name:${this.name}, age:${this.age}"
     }
 }
 
-class Socio(private val cpf: String, private val limite: Int) {
-    private val livros: MutableList<Livro> = mutableListOf()
+class Scooter(private val id: String) {
+    private var batteryMinutes: Int = 0
+    private var user: User? = null
 
-    fun getCpf(): String {
-        return this.cpf
+    fun getId(): String {
+        return this.id
     }
 
-    fun getLimite(): Int {
-        return this.limite
+    fun getBattery(): Int {
+        return this.batteryMinutes
     }
 
-    fun getLivros(): List<Livro> {
-        return this.livros.toList()
+    fun getUser(): User? {
+        return this.user
     }
 
-    fun podeEmprestar(): Boolean {
-        return this.livros.size < this.limite
-    }
-
-    fun adicionarLivro(livro: Livro): Boolean {
-        if (!this.podeEmprestar()) {
-            return false
+    fun charge(minutes: Int): Unit {
+        if (minutes > 0) {
+            this.batteryMinutes += minutes
         }
-        this.livros.add(livro)
-        return true
     }
 
-    fun removerLivro(titulo: String): Livro? {
-        val iterator: MutableIterator<Livro> = this.livros.iterator()
-        while (iterator.hasNext()) {
-            val livro: Livro = iterator.next()
-            if (livro.getTitulo() == titulo) {
-                iterator.remove()
-                return livro
-            }
+    fun enter(user: User): EnterResult {
+        if (this.user != null) {
+            return EnterResult.BUSY
         }
-        return null
+        if (!user.canRide()) {
+            return EnterResult.TOO_YOUNG
+        }
+        this.user = user
+        return EnterResult.SUCCESS
     }
 
-    fun temLivro(titulo: String): Boolean {
-        for (livro: Livro in this.livros) {
-            if (livro.getTitulo() == titulo) {
-                return true
-            }
+    fun leave(): LeaveResult {
+        if (this.user == null) {
+            return LeaveResult.NO_USER
         }
-        return false
+        this.user = null
+        return LeaveResult.SUCCESS
+    }
+
+    fun drive(minutes: Int): DriveResult {
+        if (this.user == null) {
+            return DriveResult.NO_USER
+        }
+        if (this.batteryMinutes < minutes) {
+            return DriveResult.BATTERY_DEPLETED
+        }
+        this.batteryMinutes -= minutes
+        return DriveResult.SUCCESS
     }
 
     override fun toString(): String {
-        val titulos: String = this.livros.joinToString(separator = ", ") { it.getTitulo() }
-        return "socio: ${this.cpf} [limite: ${this.limite}, emprestados: [$titulos]]"
-    }
-}
-
-class Biblioteca {
-    private val socios: MutableMap<String, Socio> = linkedMapOf()
-    private val livros: MutableMap<String, Livro> = linkedMapOf()
-
-    fun cadastrarSocio(cpf: String, limite: Int): Unit {
-        if (this.socios.containsKey(cpf)) {
-            throw IllegalArgumentException("socio already exists")
-        }
-        this.socios[cpf] = Socio(cpf, limite)
-    }
-
-    fun cadastrarLivro(titulo: String): Unit {
-        if (this.livros.containsKey(titulo)) {
-            throw IllegalArgumentException("livro already exists")
-        }
-        this.livros[titulo] = Livro(titulo)
-    }
-
-    fun emprestar(cpf: String, titulo: String): Unit {
-        val socio: Socio = this.socios[cpf] ?: throw IllegalArgumentException("socio nao encontrado")
-        val livro: Livro = this.livros[titulo] ?: throw IllegalArgumentException("livro nao encontrado")
-
-        if (livro.isEmprestado()) {
-            throw IllegalStateException("livro indisponivel")
-        }
-        if (!socio.podeEmprestar()) {
-            throw IllegalStateException("limite de emprestimos excedido")
-        }
-
-        livro.emprestar()
-        socio.adicionarLivro(livro)
-    }
-
-    fun devolver(cpf: String, titulo: String): Unit {
-        val socio: Socio = this.socios[cpf] ?: throw IllegalArgumentException("socio nao encontrado")
-        val livro: Livro = this.livros[titulo] ?: throw IllegalArgumentException("livro nao encontrado")
-
-        if (!socio.temLivro(titulo)) {
-            throw IllegalStateException("socio nao possui este livro")
-        }
-
-        socio.removerLivro(titulo)
-        livro.devolver()
-    }
-
-    override fun toString(): String {
-        val linhas: MutableList<String> = mutableListOf()
-        for (socio: Socio in this.socios.values) {
-            linhas.add(socio.toString())
-        }
-        for (livro: Livro in this.livros.values) {
-            linhas.add("livro: " + livro.toString())
-        }
-        return linhas.joinToString(separator = "\n")
+        val userInfo: String = if (this.user != null) "(${this.user})" else "(empty)"
+        return "id:${this.id}, battery:${this.batteryMinutes}, user:${userInfo}"
     }
 }
 
 fun main(): Unit {
-    var biblioteca: Biblioteca = Biblioteca()
+    var scooter: Scooter = Scooter("")
 
     while (true) {
         val line: String = readLine() ?: break
@@ -154,40 +111,22 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "init" -> biblioteca = Biblioteca()
-            "show" -> {
-                val output: String = biblioteca.toString()
-                if (output.isNotEmpty()) {
-                    println(output)
-                }
+            "init" -> scooter = Scooter(parts[1])
+            "show" -> println(scooter)
+            "charge" -> scooter.charge(parts[1].toInt())
+            "enter" -> when (scooter.enter(User(parts[1], parts[2].toInt()))) {
+                EnterResult.BUSY -> println(SCOOTER_BUSY_MSG)
+                EnterResult.TOO_YOUNG -> println(USER_TOO_YOUNG_MSG)
+                EnterResult.SUCCESS -> {}
             }
-            "add_socio" -> {
-                try {
-                    biblioteca.cadastrarSocio(parts[1], parts[2].toInt())
-                } catch (e: Exception) {
-                    println("fail: " + e.message)
-                }
+            "leave" -> when (scooter.leave()) {
+                LeaveResult.NO_USER -> println(NO_USER_MSG)
+                LeaveResult.SUCCESS -> {}
             }
-            "add_livro" -> {
-                try {
-                    biblioteca.cadastrarLivro(parts[1])
-                } catch (e: Exception) {
-                    println("fail: " + e.message)
-                }
-            }
-            "emprestar" -> {
-                try {
-                    biblioteca.emprestar(parts[1], parts[2])
-                } catch (e: Exception) {
-                    println("fail: " + e.message)
-                }
-            }
-            "devolver" -> {
-                try {
-                    biblioteca.devolver(parts[1], parts[2])
-                } catch (e: Exception) {
-                    println("fail: " + e.message)
-                }
+            "drive" -> when (scooter.drive(parts[1].toInt())) {
+                DriveResult.NO_USER -> println(NO_USER_MSG)
+                DriveResult.BATTERY_DEPLETED -> println(BATTERY_DEPLETED_MSG)
+                DriveResult.SUCCESS -> {}
             }
             else -> println(INVALID_COMMAND_MSG)
         }

@@ -1,77 +1,151 @@
-const val CART_FULL_MSG: String = "fail: cart is full"
-const val INVALID_ITEM_MSG: String = "fail: invalid item"
-const val INVALID_INDEX_MSG: String = "fail: invalid index"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
 
-class Item(
-    private val name: String = "",
-    private val price: Double = 0.0,
-    private var quantity: Int = 0
-) {
-    fun getName(): String {
-        return name
+class Livro(private val titulo: String) {
+    private var emprestado: Boolean = false
+
+    fun getTitulo(): String {
+        return this.titulo
     }
 
-    fun getPrice(): Double {
-        return price
+    fun isEmprestado(): Boolean {
+        return this.emprestado
     }
 
-    fun getQuantity(): Int {
-        return quantity
-    }
-
-    fun setQuantity(quantity: Int): Boolean {
-        if (quantity > 0) {
-            this.quantity = quantity
-            return true
+    fun emprestar(): Boolean {
+        if (this.emprestado) {
+            return false
         }
-        return false
+        this.emprestado = true
+        return true
     }
 
-    fun getTotal(): Double {
-        return price * quantity
+    fun devolver(): Boolean {
+        if (!this.emprestado) {
+            return false
+        }
+        this.emprestado = false
+        return true
     }
 
     override fun toString(): String {
-        return "$name: $price x $quantity"
+        val status: String = if (this.emprestado) "emprestado" else "disponivel"
+        return "${this.titulo} [$status]"
     }
 }
 
-class Cart(private val maxCapacity: Int = 0) {
-    private val items: MutableList<Item> = mutableListOf()
+class Socio(private val cpf: String, private val limite: Int) {
+    private val livros: MutableList<Livro> = mutableListOf()
 
-    fun addItem(item: Item): Boolean {
-        if (items.size < maxCapacity) {
-            items.add(item)
-            return true
+    fun getCpf(): String {
+        return this.cpf
+    }
+
+    fun getLimite(): Int {
+        return this.limite
+    }
+
+    fun getLivros(): List<Livro> {
+        return this.livros.toList()
+    }
+
+    fun podeEmprestar(): Boolean {
+        return this.livros.size < this.limite
+    }
+
+    fun adicionarLivro(livro: Livro): Boolean {
+        if (!this.podeEmprestar()) {
+            return false
+        }
+        this.livros.add(livro)
+        return true
+    }
+
+    fun removerLivro(titulo: String): Livro? {
+        val iterator: MutableIterator<Livro> = this.livros.iterator()
+        while (iterator.hasNext()) {
+            val livro: Livro = iterator.next()
+            if (livro.getTitulo() == titulo) {
+                iterator.remove()
+                return livro
+            }
+        }
+        return null
+    }
+
+    fun temLivro(titulo: String): Boolean {
+        for (livro: Livro in this.livros) {
+            if (livro.getTitulo() == titulo) {
+                return true
+            }
         }
         return false
-    }
-
-    fun removeItem(index: Int): Boolean {
-        if (index in 0 until items.size) {
-            items.removeAt(index)
-            return true
-        }
-        return false
-    }
-
-    fun getTotalValue(): Double {
-        return items.sumOf { it.getTotal() }
-    }
-
-    fun getItems(): List<Item> {
-        return items.toList()
     }
 
     override fun toString(): String {
-        val itemsStr: String = items.joinToString(", ") { it.toString() }
-        return "cart: [$itemsStr], total: ${getTotalValue()}"
+        val titulos: String = this.livros.joinToString(separator = ", ") { it.getTitulo() }
+        return "socio: ${this.cpf} [limite: ${this.limite}, emprestados: [$titulos]]"
+    }
+}
+
+class Biblioteca {
+    private val socios: MutableMap<String, Socio> = linkedMapOf()
+    private val livros: MutableMap<String, Livro> = linkedMapOf()
+
+    fun cadastrarSocio(cpf: String, limite: Int): Unit {
+        if (this.socios.containsKey(cpf)) {
+            throw IllegalArgumentException("socio already exists")
+        }
+        this.socios[cpf] = Socio(cpf, limite)
+    }
+
+    fun cadastrarLivro(titulo: String): Unit {
+        if (this.livros.containsKey(titulo)) {
+            throw IllegalArgumentException("livro already exists")
+        }
+        this.livros[titulo] = Livro(titulo)
+    }
+
+    fun emprestar(cpf: String, titulo: String): Unit {
+        val socio: Socio = this.socios[cpf] ?: throw IllegalArgumentException("socio nao encontrado")
+        val livro: Livro = this.livros[titulo] ?: throw IllegalArgumentException("livro nao encontrado")
+
+        if (livro.isEmprestado()) {
+            throw IllegalStateException("livro indisponivel")
+        }
+        if (!socio.podeEmprestar()) {
+            throw IllegalStateException("limite de emprestimos excedido")
+        }
+
+        livro.emprestar()
+        socio.adicionarLivro(livro)
+    }
+
+    fun devolver(cpf: String, titulo: String): Unit {
+        val socio: Socio = this.socios[cpf] ?: throw IllegalArgumentException("socio nao encontrado")
+        val livro: Livro = this.livros[titulo] ?: throw IllegalArgumentException("livro nao encontrado")
+
+        if (!socio.temLivro(titulo)) {
+            throw IllegalStateException("socio nao possui este livro")
+        }
+
+        socio.removerLivro(titulo)
+        livro.devolver()
+    }
+
+    override fun toString(): String {
+        val linhas: MutableList<String> = mutableListOf()
+        for (socio: Socio in this.socios.values) {
+            linhas.add(socio.toString())
+        }
+        for (livro: Livro in this.livros.values) {
+            linhas.add("livro: " + livro.toString())
+        }
+        return linhas.joinToString(separator = "\n")
     }
 }
 
 fun main(): Unit {
-    var cart: Cart = Cart(0)
+    var biblioteca: Biblioteca = Biblioteca()
 
     while (true) {
         val line: String = readLine() ?: break
@@ -80,25 +154,39 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "init" -> cart = Cart(parts[1].toInt())
-            "show" -> println(cart)
-            "add" -> {
-                val name: String = parts[1]
-                val price: Double = parts[2].toDouble()
-                val quantity: Int = parts[3].toInt()
-                if (price <= 0.0 || quantity <= 0) {
-                    println(INVALID_ITEM_MSG)
-                } else {
-                    val item: Item = Item(name, price, quantity)
-                    if (!cart.addItem(item)) {
-                        println(CART_FULL_MSG)
-                    }
+            "init" -> biblioteca = Biblioteca()
+            "show" -> {
+                val output: String = biblioteca.toString()
+                if (output.isNotEmpty()) {
+                    println(output)
                 }
             }
-            "remove" -> {
-                val index: Int = parts[1].toInt()
-                if (!cart.removeItem(index)) {
-                    println(INVALID_INDEX_MSG)
+            "add_socio" -> {
+                try {
+                    biblioteca.cadastrarSocio(parts[1], parts[2].toInt())
+                } catch (e: Exception) {
+                    println("fail: " + e.message)
+                }
+            }
+            "add_livro" -> {
+                try {
+                    biblioteca.cadastrarLivro(parts[1])
+                } catch (e: Exception) {
+                    println("fail: " + e.message)
+                }
+            }
+            "emprestar" -> {
+                try {
+                    biblioteca.emprestar(parts[1], parts[2])
+                } catch (e: Exception) {
+                    println("fail: " + e.message)
+                }
+            }
+            "devolver" -> {
+                try {
+                    biblioteca.devolver(parts[1], parts[2])
+                } catch (e: Exception) {
+                    println("fail: " + e.message)
                 }
             }
             else -> println(INVALID_COMMAND_MSG)

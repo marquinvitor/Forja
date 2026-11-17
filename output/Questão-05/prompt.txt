@@ -1,1 +1,1 @@
-2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total
+3 classes, com encapsulamento, mapas e exceções, no contexto de uma biblioteca de bairro que empresta livros para sócios, com limite de empréstimos por sócio e livros que podem estar indisponíveis

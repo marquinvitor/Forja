@@ -1,1 +1,1 @@
-4 classes, com herança, polimorfismo, encapsulamento e mapas, no contexto de uma oficina de bicicletas que atende bicicletas urbanas e elétricas, cada tipo com uma regra diferente de cobrança de revisão
+1 classe, com encapsulamento e invariantes, no contexto de uma garrafa térmica inteligente que controla volume de líquido, capacidade máxima e temperatura, com métodos para abastecer e servir sem permitir transbordamento nem valores negativos

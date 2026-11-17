@@ -1,10 +1,10 @@
 ---
 index_content: |2
-    - Descrição: Sistema de gerenciamento de empréstimos e acervo para uma biblioteca comunitária.
-    - Domínio: Controle de acervo literário e limites de empréstimo por associado.
-    - Objetivos: Praticar encapsulamento com invariantes, uso de mapas para indexação rápida e tratamento de exceções de domínio.
+    - Descrição: Simular o gerenciamento de patinetes elétricos urbanos com controle de tempo de bateria e associação opcional de usuários.
+    - Domínio: Um patinete elétrico comporta no máximo um usuário por vez, delegando ao passageiro regras de elegibilidade e persistindo a bateria consumida em corridas.
+    - Objetivos: Praticar agregação opcional (1 para 0..1) e delegação de comportamentos entre objetos em Kotlin.
 ---
-# [TRAIN] Biblioteca de Bairro
+# [TRAIN] Patinete Elétrico Compartilhado
 
 <!-- toc-table -->
 
@@ -12,67 +12,66 @@ index_content: |2
 
 ## Intro
 
-Dona Clara é a zelosa coordenadora da Biblioteca Popular da Vila das Flores, um espaço comunitário mantido com doações de livros para incentivar a leitura entre jovens e adultos do bairro. Durante anos, todo o controle foi feito em um velho caderno espiral: anotações de quem pegou qual livro, datas improvisadas e rasuras nas margens. Recentemente, com o aumento no número de leitores e o sumiço de obras raras, a situação ficou insustentável: sócios pegavam mais livros do que podiam cuidar e outros tentavam retirar títulos que já estavam emprestados.
+A startup de micromobilidade *EcoRide* está expandindo sua frota de patinetes elétricos pelas capitais brasileiras. Para otimizar a experiência dos usuários e garantir a segurança nas vias públicas, a engenharia de software foi encarregada de desenvolver o módulo central que orquestra os patinetes e seus condutores.
 
-Para resolver de vez o descontrole, Dona Clara pediu sua ajuda para construir um sistema em Kotlin robusto e seguro. O sistema deve impedir que as regras do negócio sejam violadas por meio de encapsulamento rígido e sinalização de falhas via exceções.
+Cada patinete possui um identificador único, um medidor de bateria em minutos e pode transportar no máximo um usuário por vez. Um passageiro pode desbloquear e embarcar no patinete, realizar corridas consumindo a carga da bateria e depois desembarcar, deixando o veículo livre para o próximo cliente.
 
-O sistema é estruturado em três classes de domínio:
+Para manter uma arquitetura coesa e desacoplada, aplicamos dois pilares essenciais da orientação a objetos:
+1. **Agregação Opcional**: O `User` existe de forma independente do `Scooter`. Quando o usuário sobe ou desce do patinete, o objeto passageiro não é destruído e continua com seu estado preservado. O patinete apenas mantém uma referência opcional (`user: User?`).
+2. **Delegação**: O patinete não deve conter regras específicas sobre critérios corporais ou cadastrais do passageiro. Quando alguém tenta embarcar, o patinete delega à classe `User` a validação de aptidão para condução (como a verificação de idade mínima legal de 18 anos).
 
-- **`Livro`**: Representa uma obra literária do acervo.
-  - Atributos: `titulo` (String) e `emprestado` (Boolean, privado com alteração restrita).
-  - Construtor: recebe o título da obra e inicializa seu estado como não emprestado (`false`).
-  - Métodos:
-    - `getTitulo(): String`: retorna o título do livro.
-    - `isEmprestado(): Boolean`: indica se a obra está atualmente emprestada.
-    - `emprestar(): Boolean`: se o livro já estiver emprestado, retorna `false`; caso contrário, marca como emprestado e retorna `true`.
-    - `devolver(): Boolean`: se o livro não estiver emprestado, retorna `false`; caso contrário, marca como não emprestado e retorna `true`.
-    - `toString(): String`: formata a representação textual do livro (ex.: `Dom_Casmurro [disponivel]` ou `Dom_Casmurro [emprestado]`).
+### Descrição das Classes e Métodos
 
-- **`Socio`**: Representa um membro cadastrado da biblioteca.
-  - Atributos: `cpf` (String), `limite` (Int, quantidade máxima de livros simultâneos) e `livros` (MutableList privada de livros atualmente em posse do sócio).
-  - Construtor: recebe o CPF e o limite máximo de livros.
-  - Métodos:
-    - `getCpf(): String`: retorna o CPF do sócio.
-    - `getLimite(): Int`: retorna o limite de empréstimos.
-    - `getLivros(): List<Livro>`: retorna uma visualização imutável da lista de livros emprestados.
-    - `podeEmprestar(): Boolean`: retorna `true` se o número de livros emprestados for estritamente menor que o limite.
-    - `adicionarLivro(livro: Livro): Boolean`: adiciona o livro se `podeEmprestar()` for verdadeiro, retornando `true`; caso contrário, retorna `false`.
-    - `removerLivro(titulo: String): Livro?`: se o sócio estiver com o livro de determinado título, remove-o e o retorna; caso contrário, retorna `null`.
-    - `temLivro(titulo: String): Boolean`: verifica se o sócio possui atualmente o livro com o título informado.
-    - `toString(): String`: formata o sócio no padrão `socio: <cpf> [limite: <limite>, emprestados: [<titulo1>, <titulo2>]]`.
+#### Classe `User`
+Representa o cidadão que utiliza o serviço.
+- **Atributos**:
+  - `name: String` (privado) - Nome do usuário.
+  - `age: Int` (privado) - Idade do usuário em anos.
+- **Construtor**: `User(name: String, age: Int)`
+- **Métodos**:
+  - `getName(): String` - Retorna o nome.
+  - `getAge(): Int` - Retorna a idade.
+  - `canRide(): Boolean` - Retorna `true` se a idade for maior ou igual a 18 anos, ou `false` caso contrário.
+  - `toString(): String` - Retorna a representação textual no formato `name:NOME, age:IDADE`.
 
-- **`Biblioteca`**: Responsável por orquestrar os cadastros e as regras de negócio.
-  - Atributos: `socios` (Map indexado pelo CPF) e `livros` (Map indexado pelo título).
-  - Construtor: inicializa os mapas de sócios e livros vazios (usando coleções que preservam a ordem de inserção).
-  - Métodos:
-    - `cadastrarSocio(cpf: String, limite: Int)`: cadastra um novo sócio. Lança `IllegalArgumentException("socio already exists")` se o CPF já estiver cadastrado.
-    - `cadastrarLivro(titulo: String)`: cadastra um novo livro no acervo. Lança `IllegalArgumentException("livro already exists")` se já houver obra com aquele título.
-    - `emprestar(cpf: String, titulo: String)`:
-      - Lança `IllegalArgumentException("socio nao encontrado")` se o sócio não existir.
-      - Lança `IllegalArgumentException("livro nao encontrado")` se o livro não existir no acervo.
-      - Lança `IllegalStateException("livro indisponivel")` se o livro já estiver emprestado.
-      - Lança `IllegalStateException("limite de emprestimos excedido")` se o sócio tiver atingido seu limite.
-      - Caso todas as condições sejam atendidas, atualiza o estado do livro e insere-o na lista do sócio.
-    - `devolver(cpf: String, titulo: String)`:
-      - Lança `IllegalArgumentException("socio nao encontrado")` se o sócio não existir.
-      - Lança `IllegalArgumentException("livro nao encontrado")` se o livro não existir no acervo.
-      - Lança `IllegalStateException("socio nao possui este livro")` se o sócio não estiver em posse da obra informada.
-      - Caso válido, remove o livro da posse do sócio e marca o livro como disponível.
-    - `toString(): String`: lista todos os sócios (um por linha) e, em seguida, todos os livros do acervo (um por linha). Se não houver itens, nada é impresso nessa respectiva seção.
-
-- **Shell / `Main`**:
-  - Lê comandos do terminal, executa as operações e captura exceções imprimindo `fail: <mensagem>`.
-  - Comandos que realizam mutação com sucesso executam de forma silenciosa.
+#### Classe `Scooter`
+Representa a unidade de transporte elétrico.
+- **Atributos**:
+  - `id: String` (privado) - Código identificador do patinete.
+  - `batteryMinutes: Int` (privado) - Carga atual da bateria convertida em minutos de uso contínuo (inicia em 0).
+  - `user: User?` (privado) - Referência opcional ao usuário atualmente embarcado (inicia nulo).
+- **Construtor**: `Scooter(id: String)`
+- **Métodos**:
+  - `getId(): String` - Retorna o identificador do patinete.
+  - `getBattery(): Int` - Retorna os minutos de bateria restantes.
+  - `getUser(): User?` - Retorna o usuário embarcado ou `null` se vazio.
+  - `charge(minutes: Int): Unit` - Adiciona minutos à bateria do patinete (apenas valores positivos).
+  - `enter(user: User): EnterResult` - Embarca o usuário no patinete.
+    - Se o patinete já tiver um passageiro, retorna `EnterResult.BUSY`.
+    - Se o usuário não tiver idade mínima (delegando para `user.canRide()`), retorna `EnterResult.TOO_YOUNG`.
+    - Se estiver apto e livre, associa o usuário e retorna `EnterResult.SUCCESS`.
+  - `leave(): LeaveResult` - Desembarca o passageiro atual.
+    - Se não houver ninguém, retorna `LeaveResult.NO_USER`.
+    - Se houver passageiro, desassocia a referência e retorna `LeaveResult.SUCCESS`.
+  - `drive(minutes: Int): DriveResult` - Realiza o percurso consumindo tempo de bateria.
+    - Se não houver passageiro embarcado, retorna `DriveResult.NO_USER`.
+    - Se a carga for insuficiente para cobrir os minutos solicitados (isto é, `batteryMinutes < minutes`), retorna `DriveResult.BATTERY_DEPLETED`.
+    - Se houver bateria suficiente e passageiro, decrementa os minutos da bateria e retorna `DriveResult.SUCCESS`.
+  - `toString(): String` - Retorna a representação textual no formato:
+    - Com passageiro: `id:{id}, battery:{batteryMinutes}, user:({user})`
+    - Sem passageiro: `id:{id}, battery:{batteryMinutes}, user:(empty)`
 
 ## Regras
 
-- O acervo e os sócios devem ser armazenados internamente na `Biblioteca` utilizando estruturas de mapa (`Map`).
-- A ordem de inserção dos sócios e livros deve ser preservada na listagem (`LinkedHashMap`).
-- Nenhuma classe de modelo (`Livro`, `Socio`, `Biblioteca`) deve imprimir mensagens diretamente no console.
-- A invariante do sócio não pode ser violada: o total de empréstimos ativos nunca pode exceder o seu limite.
-- A biblioteca deve lançar `IllegalArgumentException` para cadastros duplicados ou entidades não encontradas.
-- A biblioteca deve lançar `IllegalStateException` para violações de estado operacional (livro indisponível, limite atingido ou livro não associado ao sócio).
-- Falhas capturadas pelo Shell devem ser exibidas obrigatoriamente com o prefixo `fail: `.
+- O patinete inicia com a bateria zerada e sem usuário embarcado.
+- Apenas um usuário pode estar a bordo do patinete em um dado momento.
+- A idade mínima para condução do patinete é de 18 anos.
+- A validação de idade mínima deve ser delegada ao método `canRide()` da classe `User`.
+- Não é possível dirigir (`drive`) sem um passageiro embarcado.
+- Não é possível dirigir se a bateria restante for menor que o tempo solicitado para o trajeto.
+- Se a carga de bateria for insuficiente, a bateria não é alterada e a corrida não é realizada.
+- O recarregamento (`charge`) apenas incrementa minutos caso o valor informado seja maior que zero.
+- As classes do domínio não imprimem mensagens no console; o tratamento de exibição e erros pertence à camada de controle (`Main`).
 
 ## Diagrama
 
@@ -81,179 +80,179 @@ O sistema é estruturado em três classes de domínio:
 classDiagram
     direction TB
 
-    class Livro {
-        -titulo : String
-        -emprestado : Boolean
-        +Livro(titulo : String)
-        +getTitulo() String
-        +isEmprestado() Boolean
-        +emprestar() Boolean
-        +devolver() Boolean
+    class EnterResult {
+        <<enumeration>>
+        SUCCESS
+        BUSY
+        TOO_YOUNG
+    }
+
+    class LeaveResult {
+        <<enumeration>>
+        SUCCESS
+        NO_USER
+    }
+
+    class DriveResult {
+        <<enumeration>>
+        SUCCESS
+        NO_USER
+        BATTERY_DEPLETED
+    }
+
+    class User {
+        -name : String
+        -age : Int
+        +User(name : String, age : Int)
+        +getName() String
+        +getAge() Int
+        +canRide() Boolean
         +toString() String
     }
 
-    class Socio {
-        -cpf : String
-        -limite : Int
-        -livros : List~Livro~
-        +Socio(cpf : String, limite : Int)
-        +getCpf() String
-        +getLimite() Int
-        +getLivros() List~Livro~
-        +podeEmprestar() Boolean
-        +adicionarLivro(livro : Livro) Boolean
-        +removerLivro(titulo : String) Livro?
-        +temLivro(titulo : String) Boolean
-        +toString() String
-    }
-
-    class Biblioteca {
-        -socios : Map~String, Socio~
-        -livros : Map~String, Livro~
-        +Biblioteca()
-        +cadastrarSocio(cpf : String, limite : Int) Unit
-        +cadastrarLivro(titulo : String) Unit
-        +emprestar(cpf : String, titulo : String) Unit
-        +devolver(cpf : String, titulo : String) Unit
+    class Scooter {
+        -id : String
+        -batteryMinutes : Int
+        -user : User?
+        +Scooter(id : String)
+        +getId() String
+        +getBattery() Int
+        +getUser() User?
+        +charge(minutes : Int) Unit
+        +enter(user : User) EnterResult
+        +leave() LeaveResult
+        +drive(minutes : Int) DriveResult
         +toString() String
     }
 
     class Main {
-        +main(args : Array~String~) Unit$
+        +main() Unit
     }
 
-    Biblioteca "1" *-- "*" Socio : gerencia
-    Biblioteca "1" *-- "*" Livro : acervo
-    Socio o-- "*" Livro : possui
-    Main ..> Biblioteca : utiliza
+    Scooter o--> "0..1" User : agrega
+    Scooter ..> EnterResult : usa
+    Scooter ..> LeaveResult : usa
+    Scooter ..> DriveResult : usa
+    Main ..> Scooter : cria e gerencia
+    Main ..> User : cria
 ```
 
 ## Guide
 
-* **Passo 1 (`Livro`)**: Crie a classe `Livro` com o atributo `titulo` imutável e a flag `emprestado` com visibilidade privada para alteração (`private set`). Implemente os métodos `emprestar()` e `devolver()`, garantindo que alterem a flag e retornem `true` apenas se a transição de estado for viável.
-* **Passo 2 (`Socio`)**: Crie a classe `Socio` mantendo a lista interna de livros privada. O método `getLivros()` deve retornar uma referência de leitura imutável (`toList()`). Certifique-se de que `adicionarLivro()` consulte `podeEmprestar()` antes de aceitar uma nova obra, protegendo a invariante do limite de empréstimos.
-* **Passo 3 (`Biblioteca`)**: Crie a classe `Biblioteca` utilizando `mutableMapOf<String, Socio>()` e `mutableMapOf<String, Livro>()`. No método `emprestar()`, valide as quatro condições na ordem estipulada (existência de sócio, existência de livro, disponibilidade do livro e capacidade do sócio), disparando as exceções adequadas (`IllegalArgumentException` e `IllegalStateException`).
-* **Passo 4 (`Main`)**: Monte o laço interativo do Shell. Utilize um bloco `try / catch (e: Exception)` ao redor do processamento de cada linha para capturar as exceções das regras de negócio e exibir `fail: ${e.message}`. Adicione o comando `show` para invocar o `toString()` da biblioteca.
+* Comece criando a classe `User`: defina os atributos `name` e `age`, implemente o método de delegação `canRide()` checando se a idade é maior ou igual a 18 e monte seu `toString()`.
+* Crie as enumerações de resultado (`EnterResult`, `LeaveResult`, `DriveResult`) para garantir que os métodos de negócio não imprimam nada no terminal.
+* Crie a classe `Scooter` com a referência anulável `var user: User? = null` e `var batteryMinutes: Int = 0`.
+* Implemente o método `enter(user: User)`: cheque primeiro se já existe usuário no patinete (`user != null`), depois delegue a validação ao passageiro (`!user.canRide()`) e só então atribua a referência.
+* Implemente `drive(minutes: Int)`: valide se há passageiro a bordo e se a bateria cobre todo o tempo solicitado antes de debitar os minutos.
+* No `Main`, processe os comandos recebidos e mapeie os retornos das enumerações para as mensagens de falha esperadas (`fail: scooter is busy`, `fail: user too young`, `fail: no user on scooter`, `fail: battery depleted`).
 
 Perguntas de reflexão:
-1. Por que a responsabilidade de lançar exceções com mensagens de negócio ficou na classe `Biblioteca`, enquanto `Livro` e `Socio` retornam booleanos ou nulos em suas operações atômicas?
-2. Como a utilização de mapas (`Map`) por chave primária (CPF e título) altera a complexidade de tempo de busca em relação a uma busca linear em listas?
+1. Por que manter o ciclo de vida do `User` independente do ciclo de vida de `Scooter` caracteriza agregação e não composição?
+2. Quais são as vantagens de fazer o patinete consultar `user.canRide()` em vez de verificar diretamente `user.getAge() >= 18` dentro de `Scooter`?
 
 ## Shell
 
 ```bash
-#TEST_CASE cadastro_e_exibicao
+#TEST_CASE inicializacao_e_exibicao
 
+$init eco01
 $show
-$add_socio 111 2
-$add_socio 222 1
-$add_livro Dom_Casmurro
-$add_livro O_Hobbit
+id:eco01, battery:0, user:(empty)
+$charge 20
 $show
-socio: 111 [limite: 2, emprestados: []]
-socio: 222 [limite: 1, emprestados: []]
-livro: Dom_Casmurro [disponivel]
-livro: O_Hobbit [disponivel]
+id:eco01, battery:20, user:(empty)
 $end
 ```
 
 ```bash
-#TEST_CASE duplicidade_e_preservacao
+#TEST_CASE embarque_e_desembarque
 
-$add_socio 111 2
-$add_socio 111 3
-fail: socio already exists
-$add_livro Dom_Casmurro
-$add_livro Dom_Casmurro
-fail: livro already exists
+$init eco01
+$enter Joao 25
 $show
-socio: 111 [limite: 2, emprestados: []]
-livro: Dom_Casmurro [disponivel]
+id:eco01, battery:0, user:(name:Joao, age:25)
+$leave
+$show
+id:eco01, battery:0, user:(empty)
+$leave
+fail: no user on scooter
 $end
 ```
 
 ```bash
-#TEST_CASE fluxo_emprestimo_e_devolucao
+#TEST_CASE validacao_de_idade
 
-$add_socio 111 2
-$add_livro Dom_Casmurro
-$add_livro O_Hobbit
-$emprestar 111 Dom_Casmurro
+$init eco01
+$enter Pedrinho 12
+fail: user too young
 $show
-socio: 111 [limite: 2, emprestados: [Dom_Casmurro]]
-livro: Dom_Casmurro [emprestado]
-livro: O_Hobbit [disponivel]
-$devolver 111 Dom_Casmurro
+id:eco01, battery:0, user:(empty)
+$enter Ana 17
+fail: user too young
 $show
-socio: 111 [limite: 2, emprestados: []]
-livro: Dom_Casmurro [disponivel]
-livro: O_Hobbit [disponivel]
+id:eco01, battery:0, user:(empty)
+$enter Beatriz 18
+$show
+id:eco01, battery:0, user:(name:Beatriz, age:18)
 $end
 ```
 
 ```bash
-#TEST_CASE falhas_de_entidade_e_disponibilidade
+#TEST_CASE patinete_ocupado
 
-$add_socio 111 2
-$add_socio 222 2
-$add_livro O_Hobbit
-$emprestar 999 O_Hobbit
-fail: socio nao encontrado
-$emprestar 111 Livro_Fantasma
-fail: livro nao encontrado
-$emprestar 111 O_Hobbit
-$emprestar 222 O_Hobbit
-fail: livro indisponivel
+$init eco01
+$enter Carlos 30
 $show
-socio: 111 [limite: 2, emprestados: [O_Hobbit]]
-socio: 222 [limite: 2, emprestados: []]
-livro: O_Hobbit [emprestado]
+id:eco01, battery:0, user:(name:Carlos, age:30)
+$enter Mariana 22
+fail: scooter is busy
+$show
+id:eco01, battery:0, user:(name:Carlos, age:30)
 $end
 ```
 
 ```bash
-#TEST_CASE limite_de_emprestimos_e_fronteira
+#TEST_CASE corrida_e_consumo_de_bateria
 
-$add_socio 333 1
-$add_livro Livro_A
-$add_livro Livro_B
-$emprestar 333 Livro_A
-$emprestar 333 Livro_B
-fail: limite de emprestimos excedido
+$init eco01
+$charge 30
+$drive 10
+fail: no user on scooter
+$enter Marcos 28
+$drive 10
 $show
-socio: 333 [limite: 1, emprestados: [Livro_A]]
-livro: Livro_A [emprestado]
-livro: Livro_B [disponivel]
-$devolver 333 Livro_A
-$emprestar 333 Livro_B
+id:eco01, battery:20, user:(name:Marcos, age:28)
+$drive 25
+fail: battery depleted
 $show
-socio: 333 [limite: 1, emprestados: [Livro_B]]
-livro: Livro_A [disponivel]
-livro: Livro_B [emprestado]
+id:eco01, battery:20, user:(name:Marcos, age:28)
+$drive 20
+$show
+id:eco01, battery:0, user:(name:Marcos, age:28)
+$drive 1
+fail: battery depleted
 $end
 ```
 
 ```bash
-#TEST_CASE devolucao_invalida
+#TEST_CASE fluxo_completo_multiplos_usuarios
 
-$add_socio 111 2
-$add_socio 222 2
-$add_livro Livro_A
-$add_livro Livro_B
-$emprestar 111 Livro_A
-$devolver 999 Livro_A
-fail: socio nao encontrado
-$devolver 111 Livro_Inexistente
-fail: livro nao encontrado
-$devolver 111 Livro_B
-fail: socio nao possui este livro
-$devolver 222 Livro_A
-fail: socio nao possui este livro
+$init eco02
+$charge 50
+$enter Lucas 20
+$drive 15
 $show
-socio: 111 [limite: 2, emprestados: [Livro_A]]
-socio: 222 [limite: 2, emprestados: []]
-livro: Livro_A [emprestado]
-livro: Livro_B [disponivel]
+id:eco02, battery:35, user:(name:Lucas, age:20)
+$leave
+$show
+id:eco02, battery:35, user:(empty)
+$enter Diana 24
+$drive 35
+$show
+id:eco02, battery:0, user:(name:Diana, age:24)
+$leave
+$show
+id:eco02, battery:0, user:(empty)
 $end
 ```
 

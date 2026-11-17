@@ -1,108 +1,97 @@
-const val SCOOTER_BUSY_MSG: String = "fail: scooter is busy"
-const val USER_TOO_YOUNG_MSG: String = "fail: user too young"
-const val NO_USER_MSG: String = "fail: no user on scooter"
-const val BATTERY_DEPLETED_MSG: String = "fail: battery depleted"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
+const val INVALID_INDEX_MSG: String = "fail: invalid index"
+const val BAY_OCCUPIED_MSG: String = "fail: bay is already occupied"
+const val VEHICLE_ALREADY_PARKED_MSG: String = "fail: vehicle already parked"
+const val BAY_EMPTY_MSG: String = "fail: bay is empty"
 
-enum class EnterResult {
-    SUCCESS,
-    BUSY,
-    TOO_YOUNG
-}
-
-enum class LeaveResult {
-    SUCCESS,
-    NO_USER
-}
-
-enum class DriveResult {
-    SUCCESS,
-    NO_USER,
-    BATTERY_DEPLETED
-}
-
-class User(private val name: String, private val age: Int) {
-    companion object {
-        const val MIN_AGE: Int = 18
-    }
-
-    fun getName(): String {
-        return this.name
-    }
-
-    fun getAge(): Int {
-        return this.age
-    }
-
-    fun canRide(): Boolean {
-        return this.age >= MIN_AGE
+class Vehicle(private val plate: String = "") {
+    fun getPlate(): String {
+        return this.plate
     }
 
     override fun toString(): String {
-        return "name:${this.name}, age:${this.age}"
+        return "[${this.plate}]"
     }
 }
 
-class Scooter(private val id: String) {
-    private var batteryMinutes: Int = 0
-    private var user: User? = null
+class ParkingLot(private val capacity: Int = 0) {
+    private var bays: Array<Vehicle?> = arrayOfNulls<Vehicle>(capacity)
 
-    fun getId(): String {
-        return this.id
+    init {
+        this.bays = arrayOfNulls<Vehicle>(this.capacity)
     }
 
-    fun getBattery(): Int {
-        return this.batteryMinutes
+    fun getCapacity(): Int {
+        return this.capacity
     }
 
-    fun getUser(): User? {
-        return this.user
+    fun getVehicle(index: Int): Vehicle? {
+        if (index < 0 || index >= this.capacity) {
+            return null
+        }
+        return this.bays[index]
     }
 
-    fun charge(minutes: Int): Unit {
-        if (minutes > 0) {
-            this.batteryMinutes += minutes
+    fun findVehicle(plate: String): Int {
+        var i: Int = 0
+        while (i < this.capacity) {
+            val v: Vehicle? = this.bays[i]
+            if (v != null && v.getPlate() == plate) {
+                return i
+            }
+            i = i + 1
         }
+        return -1
     }
 
-    fun enter(user: User): EnterResult {
-        if (this.user != null) {
-            return EnterResult.BUSY
+    fun park(index: Int, vehicle: Vehicle): Boolean {
+        if (index < 0 || index >= this.capacity) {
+            throw IllegalArgumentException(INVALID_INDEX_MSG)
         }
-        if (!user.canRide()) {
-            return EnterResult.TOO_YOUNG
+        if (this.bays[index] != null) {
+            throw IllegalStateException(BAY_OCCUPIED_MSG)
         }
-        this.user = user
-        return EnterResult.SUCCESS
+        if (this.findVehicle(vehicle.getPlate()) != -1) {
+            throw IllegalStateException(VEHICLE_ALREADY_PARKED_MSG)
+        }
+        this.bays[index] = vehicle
+        return true
     }
 
-    fun leave(): LeaveResult {
-        if (this.user == null) {
-            return LeaveResult.NO_USER
+    fun leave(index: Int): Vehicle? {
+        if (index < 0 || index >= this.capacity) {
+            throw IllegalArgumentException(INVALID_INDEX_MSG)
         }
-        this.user = null
-        return LeaveResult.SUCCESS
-    }
-
-    fun drive(minutes: Int): DriveResult {
-        if (this.user == null) {
-            return DriveResult.NO_USER
+        val v: Vehicle? = this.bays[index]
+        if (v == null) {
+            throw IllegalStateException(BAY_EMPTY_MSG)
         }
-        if (this.batteryMinutes < minutes) {
-            return DriveResult.BATTERY_DEPLETED
-        }
-        this.batteryMinutes -= minutes
-        return DriveResult.SUCCESS
+        this.bays[index] = null
+        return v
     }
 
     override fun toString(): String {
-        val userInfo: String = if (this.user != null) "(${this.user})" else "(empty)"
-        return "id:${this.id}, battery:${this.batteryMinutes}, user:${userInfo}"
+        var result: String = ""
+        var i: Int = 0
+        while (i < this.capacity) {
+            val v: Vehicle? = this.bays[i]
+            val line: String = if (v == null) {
+                "${i}: empty"
+            } else {
+                "${i}: ${v.toString()}"
+            }
+            if (i > 0) {
+                result = result + "\n"
+            }
+            result = result + line
+            i = i + 1
+        }
+        return result
     }
 }
 
 fun main(): Unit {
-    var scooter: Scooter = Scooter("")
+    var parkingLot: ParkingLot = ParkingLot(0)
 
     while (true) {
         val line: String = readLine() ?: break
@@ -111,22 +100,21 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "init" -> scooter = Scooter(parts[1])
-            "show" -> println(scooter)
-            "charge" -> scooter.charge(parts[1].toInt())
-            "enter" -> when (scooter.enter(User(parts[1], parts[2].toInt()))) {
-                EnterResult.BUSY -> println(SCOOTER_BUSY_MSG)
-                EnterResult.TOO_YOUNG -> println(USER_TOO_YOUNG_MSG)
-                EnterResult.SUCCESS -> {}
+            "init" -> parkingLot = ParkingLot(parts[1].toInt())
+            "show" -> println(parkingLot)
+            "park" -> {
+                try {
+                    parkingLot.park(parts[1].toInt(), Vehicle(parts[2]))
+                } catch (e: Exception) {
+                    println(e.message)
+                }
             }
-            "leave" -> when (scooter.leave()) {
-                LeaveResult.NO_USER -> println(NO_USER_MSG)
-                LeaveResult.SUCCESS -> {}
-            }
-            "drive" -> when (scooter.drive(parts[1].toInt())) {
-                DriveResult.NO_USER -> println(NO_USER_MSG)
-                DriveResult.BATTERY_DEPLETED -> println(BATTERY_DEPLETED_MSG)
-                DriveResult.SUCCESS -> {}
+            "leave" -> {
+                try {
+                    parkingLot.leave(parts[1].toInt())
+                } catch (e: Exception) {
+                    println(e.message)
+                }
             }
             else -> println(INVALID_COMMAND_MSG)
         }

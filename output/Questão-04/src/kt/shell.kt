@@ -1,87 +1,53 @@
-const val SCOOTER_BUSY_MSG: String = "fail: scooter is busy"
-const val USER_TOO_YOUNG_MSG: String = "fail: user too young"
-const val NO_USER_MSG: String = "fail: no user on scooter"
-const val BATTERY_DEPLETED_MSG: String = "fail: battery depleted"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
+const val INVALID_INDEX_MSG: String = "fail: invalid index"
+const val BAY_OCCUPIED_MSG: String = "fail: bay is already occupied"
+const val VEHICLE_ALREADY_PARKED_MSG: String = "fail: vehicle already parked"
+const val BAY_EMPTY_MSG: String = "fail: bay is empty"
 
-enum class EnterResult {
-    SUCCESS,
-    BUSY,
-    TOO_YOUNG
-}
-
-enum class LeaveResult {
-    SUCCESS,
-    NO_USER
-}
-
-enum class DriveResult {
-    SUCCESS,
-    NO_USER,
-    BATTERY_DEPLETED
-}
-
-class User(private val name: String, private val age: Int) {
-    companion object {
-        const val MIN_AGE: Int = 18
-    }
-
-    fun getName(): String {
-        TODO("retorne o nome do usuario")
-    }
-
-    fun getAge(): Int {
-        TODO("retorne a idade do usuario")
-    }
-
-    fun canRide(): Boolean {
-        TODO("retorne true se a idade for maior ou igual a MIN_AGE, ou false caso contrario")
+class Vehicle(private val plate: String = "") {
+    fun getPlate(): String {
+        TODO("retorne a placa do veículo")
     }
 
     override fun toString(): String {
-        TODO("retorne a representacao textual no formato name:NOME, age:IDADE")
+        TODO("retorne a representação textual do veículo no formato [<plate>]")
     }
 }
 
-class Scooter(private val id: String) {
-    private var batteryMinutes: Int = 0
-    private var user: User? = null
+class ParkingLot(private val capacity: Int = 0) {
+    private var bays: Array<Vehicle?> = arrayOfNulls<Vehicle>(0)
 
-    fun getId(): String {
-        TODO("retorne o identificador do patinete")
+    init {
+        // TODO: inicialize os atributos
     }
 
-    fun getBattery(): Int {
-        TODO("retorne os minutos de bateria restantes")
+    fun getCapacity(): Int {
+        TODO("retorne a capacidade total de vagas do estacionamento")
     }
 
-    fun getUser(): User? {
-        TODO("retorne a referencia ao usuario embarcado ou null se vazio")
+    fun getVehicle(index: Int): Vehicle? {
+        TODO("retorne o veículo na vaga index ou null se vazia/índice inválido")
     }
 
-    fun charge(minutes: Int): Unit {
-        TODO("adicione os minutos positivos a carga de bateria")
+    fun findVehicle(plate: String): Int {
+        TODO("retorne o índice da vaga onde o veículo está ou -1 se não estiver presente")
     }
 
-    fun enter(user: User): EnterResult {
-        TODO("embarque o usuario checando se ja esta ocupado e delegando canRide() para validacao de idade")
+    fun park(index: Int, vehicle: Vehicle): Boolean {
+        TODO("valide o índice (INVALID_INDEX_MSG), se a vaga está ocupada (BAY_OCCUPIED_MSG) e se o veículo já está no pátio (VEHICLE_ALREADY_PARKED_MSG); estacione e retorne true")
     }
 
-    fun leave(): LeaveResult {
-        TODO("desembarque o usuario atual ou retorne NO_USER se ja estiver vazio")
-    }
-
-    fun drive(minutes: Int): DriveResult {
-        TODO("realize a corrida consumindo minutos se houver usuario e bateria suficiente")
+    fun leave(index: Int): Vehicle? {
+        TODO("valide o índice (INVALID_INDEX_MSG) e se a vaga está vazia (BAY_EMPTY_MSG); libere a vaga e retorne o veículo removido")
     }
 
     override fun toString(): String {
-        TODO("retorne a representacao textual no formato id:ID, battery:BATTERY, user:(USER|empty)")
+        TODO("retorne a representação textual de todas as vagas, uma por linha (ex: '0: empty' ou '1: [CarA]')")
     }
 }
 
 fun main(): Unit {
-    var scooter: Scooter = Scooter("")
+    var parkingLot: ParkingLot = ParkingLot(0)
 
     while (true) {
         val line: String = readLine() ?: break
@@ -90,22 +56,21 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "init" -> scooter = Scooter(parts[1])
-            "show" -> println(scooter)
-            "charge" -> scooter.charge(parts[1].toInt())
-            "enter" -> when (scooter.enter(User(parts[1], parts[2].toInt()))) {
-                EnterResult.BUSY -> println(SCOOTER_BUSY_MSG)
-                EnterResult.TOO_YOUNG -> println(USER_TOO_YOUNG_MSG)
-                EnterResult.SUCCESS -> {}
+            "init" -> parkingLot = ParkingLot(parts[1].toInt())
+            "show" -> println(parkingLot)
+            "park" -> {
+                try {
+                    parkingLot.park(parts[1].toInt(), Vehicle(parts[2]))
+                } catch (e: Exception) {
+                    println(e.message)
+                }
             }
-            "leave" -> when (scooter.leave()) {
-                LeaveResult.NO_USER -> println(NO_USER_MSG)
-                LeaveResult.SUCCESS -> {}
-            }
-            "drive" -> when (scooter.drive(parts[1].toInt())) {
-                DriveResult.NO_USER -> println(NO_USER_MSG)
-                DriveResult.BATTERY_DEPLETED -> println(BATTERY_DEPLETED_MSG)
-                DriveResult.SUCCESS -> {}
+            "leave" -> {
+                try {
+                    parkingLot.leave(parts[1].toInt())
+                } catch (e: Exception) {
+                    println(e.message)
+                }
             }
             else -> println(INVALID_COMMAND_MSG)
         }

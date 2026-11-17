@@ -1,10 +1,10 @@
 ---
 index_content: |2
-    - Descrição: Implementação de um estacionamento com capacidade fixa de vagas numeradas onde cada vaga pode conter um veículo ou estar vazia.
-    - Domínio: Gestão e alocação de vagas fixas para veículos em um pátio rotativo.
-    - Objetivos: Aplicar conceitos de posições fixas com ausência (nullability), encapsulamento e proteção de invariantes de negócio em Kotlin.
+    - Descrição: Sistema para gerenciamento de revisões de bicicletas urbanas e elétricas em uma oficina mecânica.
+    - Domínio: Gestão de oficina com cobrança polimórfica de serviços por tipo de bicicleta.
+    - Objetivos: Praticar herança, polimorfismo, encapsulamento com invariantes e uso de mapas.
 ---
-# [TRAIN] Estacionamento Rotativo
+# [TRAIN] Oficina de Bicicletas
 
 <!-- toc-table -->
 
@@ -12,55 +12,57 @@ index_content: |2
 
 ## Intro
 
-Seu Valdemar administra o *ParkSafe*, um estacionamento no centro financeiro da cidade. O pátio possui um número fixo de vagas demarcadas e numeradas no chão, de `0` até `capacity - 1`. Nos horários de pico, a confusão gerada por carros ocupando vagas já reservadas ou manobristas tentando guardar dois carros na mesma demarcação causava engarrafamentos homéricos na portaria. Para sanar de vez o problema, Valdemar encomendou um sistema digital que gerencie com precisão cirúrgica a ocupação de cada vaga.
+Em meio ao trânsito caótico da metrópole, Carlos abriu a *CicloTech*, uma oficina especializada em atender desde ciclistas urbanos tradicionais até adeptos das modernas bicicletas elétricas. No início, o controle das ordens de serviço era feito em um caderno amassado, mas logo surgiram problemas: revisões de e-bikes cobradas com preço de urbana causavam prejuízos com manutenção de motores potentes, enquanto clientes reclamavam de quilometragens anotadas com valores negativos por distração dos mecânicos.
 
-Você foi encarregado de construir o núcleo desse sistema em Kotlin, estruturado em três classes: `Vehicle`, `ParkingLot` e `Main`.
+Para profissionalizar o negócio, Carlos decidiu encomendar um sistema orientado a objetos robusto. Cada bicicleta que entra na oficina recebe uma identificação única e tem sua quilometragem registrada sob rigoroso controle de invariante. Além disso, a cobrança da revisão é calculada de forma polimórfica: bicicletas urbanas pagam uma taxa fixa simples acrescida por quilômetro rodado, enquanto bicicletas elétricas consideram também a potência do motor para cobrir o desgaste elétrico.
 
-### Classes e Métodos
+O sistema é composto pelas seguintes classes e responsabilidades:
 
-1. **`Vehicle`**:
-   - Atributos privados:
-     - `plate: String`: a placa ou identificador único do veículo.
+1. **`Bicicleta`** (Classe Abstrata):
+   - Atributos:
+     - `codigo` (`String`): Identificador único da bicicleta.
+     - `quilometragem` (`Int`): Distância percorrida em quilômetros (deve ser $\ge 0$).
+   - Construtor: Inicializa `codigo` e `quilometragem`.
    - Métodos:
-     - Construtor que recebe `plate`.
-     - `getPlate(): String`: retorna a placa do veículo.
-     - `toString(): String`: representação textual no formato `[<plate>]`.
+     - `getCodigo(): String`: Retorna o código identificador.
+     - `getQuilometragem(): Int`: Retorna a quilometragem atual.
+     - `setQuilometragem(km: Int): Boolean`: Atualiza a quilometragem apenas se $km \ge 0$, retornando `true` em sucesso e `false` se o valor for inválido, preservando o estado anterior.
+     - `calcularRevisao(): Double` (abstrato): Calcula o custo total da revisão.
 
-2. **`ParkingLot`**:
-   - Atributos privados:
-     - `bays: Array<Vehicle?>`: vetor de tamanho fixo onde cada índice representa uma vaga numerada. Uma posição com `null` indica que a vaga está vazia.
+2. **`BicicletaUrbana`** (Subclasse de `Bicicleta`):
+   - Construtor: Recebe `codigo` e `quilometragem`.
    - Métodos:
-     - Construtor `ParkingLot(capacity: Int)`: inicializa o vetor de vagas com o tamanho informado, todas inicialmente vazias (`null`).
-     - `getCapacity(): Int`: retorna o total de vagas.
-     - `getVehicle(index: Int): Vehicle?`: retorna o veículo na vaga `index`, ou `null` se vazia/fora do intervalo.
-     - `findVehicle(plate: String): Int`: método auxiliar que retorna o índice da vaga onde o veículo com a placa informada se encontra, ou `-1` se não estiver no pátio.
-     - `park(index: Int, vehicle: Vehicle): Boolean`: estaciona o veículo na vaga `index`.
-       - Falha com `fail: invalid index` se `index < 0` ou `index >= capacity`.
-       - Falha com `fail: bay is already occupied` se já houver um veículo na vaga.
-       - Falha com `fail: vehicle already parked` se já existir outro veículo com a mesma placa em qualquer vaga do estacionamento.
-       - Em caso de sucesso, armazena o veículo e retorna `true`.
-     - `leave(index: Int): Vehicle?`: retira o veículo da vaga indicada.
-       - Falha com `fail: invalid index` se o índice estiver fora dos limites.
-       - Falha com `fail: bay is empty` se a vaga estiver vazia.
-       - Em caso de sucesso, desocupa a vaga (atribui `null`) e retorna a referência do veículo removido.
-     - `show(): Unit`: imprime o estado de todas as vagas no formato:
-       ```text
-       0: empty
-       1: [CarA]
-       2: empty
-       ```
+     - `calcularRevisao(): Double`: Retorna a taxa base de R$ 50.00 mais R$ 0.10 por quilômetro rodado.
+     - `toString(): String`: Retorna a representação formatada no padrão:  
+       `"urbana: <codigo>, km: <quilometragem>, cost: <calcularRevisao()>"`
 
-3. **`Main`**:
-   - Contém a função principal de execução e o laço de interpretação dos comandos do terminal.
+3. **`BicicletaEletrica`** (Subclasse de `Bicicleta`):
+   - Atributos adicionais:
+     - `potencia` (`Int`): Potência do motor em Watts.
+   - Construtor: Recebe `codigo`, `quilometragem` e `potencia`.
+   - Métodos:
+     - `getPotencia(): Int`: Retorna a potência do motor.
+     - `calcularRevisao(): Double`: Retorna a taxa base de R$ 100.00 mais R$ 0.20 por quilômetro rodado, acrescido de uma taxa extra de R$ 50.00 caso a potência seja estritamente superior a 250W.
+     - `toString(): String`: Retorna a representação formatada no padrão:  
+       `"eletrica: <codigo>, km: <quilometragem>, potencia: <potencia>W, cost: <calcularRevisao()>"`
+
+4. **`Oficina`** (Classe de Gerenciamento):
+   - Atributos:
+     - `bicicletas` (`Map<String, Bicicleta>`): Armazena as bicicletas cadastradas tendo o código como chave. Recomenda-se o uso de mapa ordenado (`sortedMapOf` ou ordenação por chave na listagem) para garantir saída consistente.
+   - Métodos:
+     - `adicionarBicicleta(bike: Bicicleta): Boolean`: Insere a bicicleta no mapa se o código ainda não existir, retornando `true`; se já existir, retorna `false`.
+     - `buscarBicicleta(codigo: String): Bicicleta?`: Retorna a bicicleta associada ao código ou `null` caso não encontrada.
+     - `obterTodas(): List<Bicicleta>`: Retorna a lista com todas as bicicletas cadastradas ordenadas alfabeticamente pelo código.
 
 ## Regras
 
-- A capacidade do pátio é imutável após a inicialização.
-- Nenhuma vaga pode ser acessada ou alterada diretamente fora dos métodos da classe `ParkingLot`.
-- Vagas desocupadas devem ser estritamente representadas por `null`.
-- Não é permitido estacionar dois veículos na mesma vaga simultaneamente.
-- Um mesmo veículo (mesma placa) não pode estar estacionado em duas vagas ao mesmo tempo.
-- Operações com índices inválidos não devem provocar exceções não tratadas (`IndexOutOfBoundsException`), devendo emitir mensagens amigáveis de erro.
+- O código da bicicleta é a chave única no mapa da oficina; cadastrar um código já existente deve falhar e o sistema deve exibir `fail: bike already exists`.
+- A quilometragem de uma bicicleta não pode ser negativa; chamadas a `setQuilometragem` com valor menor que 0 devem falhar retornando `false` e mantendo inalterado o valor anterior.
+- Bicicletas urbanas cobram taxa base de R$ 50.00 acrescida de R$ 0.10 por km rodado.
+- Bicicletas elétricas cobram taxa base de R$ 100.00 mais R$ 0.20 por km rodado, além de um adicional de R$ 50.00 se a potência for maior que 250W.
+- Operações de busca ou alteração em bicicletas inexistentes no mapa devem exibir `fail: bike not found`.
+- O comando de listagem geral em uma oficina sem bicicletas cadastradas deve exibir `fail: empty workshop`.
+- As classes de domínio nunca realizam saídas de texto diretamente (`println`); elas retornam valores (`Boolean`, objetos, `null`) para que o `Main` faça o tratamento e exibição.
 
 ## Diagrama
 
@@ -69,123 +71,121 @@ Você foi encarregado de construir o núcleo desse sistema em Kotlin, estruturad
 classDiagram
     direction TB
 
-    class Vehicle {
-        -plate : String
-        +getPlate() String
+    class Bicicleta {
+        <<abstract>>
+        -codigo : String
+        -quilometragem : Int
+        +getCodigo() String
+        +getQuilometragem() Int
+        +setQuilometragem(km : Int) Boolean
+        +calcularRevisao()* Double
         +toString() String
     }
 
-    class ParkingLot {
-        -bays : Array~Vehicle?~
-        +constructor(capacity : Int)
-        +getCapacity() Int
-        +getVehicle(index : Int) Vehicle?
-        +findVehicle(plate : String) Int
-        +park(index : Int, vehicle : Vehicle) Boolean
-        +leave(index : Int) Vehicle?
-        +show() Unit
+    class BicicletaUrbana {
+        +calcularRevisao() Double
+        +toString() String
+    }
+
+    class BicicletaEletrica {
+        -potencia : Int
+        +getPotencia() Int
+        +calcularRevisao() Double
+        +toString() String
+    }
+
+    class Oficina {
+        -bicicletas : Map~String, Bicicleta~
+        +adicionarBicicleta(bike : Bicicleta) Boolean
+        +buscarBicicleta(codigo : String) Bicicleta
+        +obterTodas() List~Bicicleta~
     }
 
     class Main {
         +main(args : Array~String~) Unit
     }
 
-    ParkingLot o-- Vehicle : manages
-    Main ..> ParkingLot : creates and uses
-    Main ..> Vehicle : creates and uses
+    Bicicleta <|-- BicicletaUrbana
+    Bicicleta <|-- BicicletaEletrica
+    Oficina "1" o-- "*" Bicicleta : gerencia
+    Main ..> Oficina : interage
 ```
 
 ## Guide
 
-* Comece criando a classe `Vehicle`: ela encapsula apenas uma `String` imutável (`plate`), sem permitir modificações externas após a criação.
-* Em `ParkingLot`, declare o atributo de vagas como `private val bays: Array<Vehicle?> = arrayOfNulls(capacity)`. O uso de `Array` de tamanho fixo combinado com o operador de nulidade `?` traduz perfeitamente o conceito de posições fixas com ausência.
-* Escreva um método privado de validação de limites `isValidIndex(index: Int): Boolean` para reutilizar nas operações de `park` e `leave`, evitando duplicação de checagens.
-* Implemente o método `findVehicle` para percorrer o array e checar se uma placa já existe antes de autorizar a alocação de um novo veículo.
-* Na classe `Main`, processe a leitura das linhas com `Scanner` ou `readLine()`, garantindo o eco das entradas que iniciam com `$`.
+* Comece criando a classe abstrata `Bicicleta`. Garanta que o atributo `quilometragem` seja privado e que o método `setQuilometragem(km: Int): Boolean` valide a invariante ($km \ge 0$), retornando `false` sem alterar o valor em caso de entrada negativa.
+* Implemente as classes `BicicletaUrbana` e `BicicletaEletrica` estendendo `Bicicleta`. Sobrescreva `calcularRevisao(): Double` aplicando as regras de precificação de cada modalidade e implemente o método `toString()` de cada uma conforme a especificação.
+* Crie a classe `Oficina` encapsulando uma coleção do tipo `Map<String, Bicicleta>`. Implemente os métodos de inserção verificando a existência da chave (`containsKey`), de busca direta e de recuperação de todas as bicicletas com ordenação pela chave.
+* Monte a função `main` processando os comandos a partir da entrada padrão (`Scanner` ou `readLine`). Trate os retornos dos métodos da oficina e imprima as mensagens de sucesso ou falha correspondentes.
 
 Perguntas de reflexão:
-1. Por que a estrutura `Array<Vehicle?>` é mais adequada para este problema do que uma `ArrayList<Vehicle>` com redimensionamento dinâmico?
-2. Como a encapsulação da coleção `bays` garante que a capacidade e a integridade das vagas não sejam burladas pelo código cliente?
+- Por que delegar a responsabilidade do cálculo de revisão para cada subclasse (`BicicletaUrbana` e `BicicletaEletrica`) através do polimorfismo é superior a verificar o tipo da bicicleta com operadores como `is` ou `when` dentro da classe `Oficina`?
+- Como o retorno booleano no setter `setQuilometragem` auxilia a camada de apresentação (`Main`) a comunicar erros sem que o domínio precise acoplar dependências de saída (`System.out`)?
 
 ## Shell
 
 ```bash
-#TEST_CASE inicializacao_e_show
+#TEST_CASE cadastro_e_unicidade
 
-$init 3
-$show
-0: empty
-1: empty
-2: empty
+$add_urbana b1 1200
+success
+$add_eletrica b2 500 350
+success
+$add_urbana b1 200
+fail: bike already exists
 $end
 ```
 
 ```bash
-#TEST_CASE estacionar_com_sucesso
+#TEST_CASE encapsulamento_e_invariante
 
-$init 2
-$park 0 CarA
-$park 1 CarB
-$show
-0: [CarA]
-1: [CarB]
+$add_urbana b1 1000
+success
+$set_km b1 -50
+fail: invalid km
+$set_km b1 1500
+success
+$show b1
+urbana: b1, km: 1500, cost: 200.0
 $end
 ```
 
 ```bash
-#TEST_CASE falhas_de_estacionar
+#TEST_CASE revisao_polimorfica_eletrica
 
-$init 3
-$park -1 CarA
-fail: invalid index
-$park 3 CarA
-fail: invalid index
-$park 0 CarA
-$park 0 CarB
-fail: bay is already occupied
-$park 1 CarA
-fail: vehicle already parked
-$show
-0: [CarA]
-1: empty
-2: empty
+$add_eletrica e1 200 300
+success
+$show e1
+eletrica: e1, km: 200, potencia: 300W, cost: 190.0
+$add_eletrica e2 200 250
+success
+$show e2
+eletrica: e2, km: 200, potencia: 250W, cost: 140.0
 $end
 ```
 
 ```bash
-#TEST_CASE remocao_veiculo
+#TEST_CASE elementos_inexistentes
 
-$init 3
-$park 1 CarX
-$leave 0
-fail: bay is empty
-$leave 5
-fail: invalid index
-$leave 1
-$show
-0: empty
-1: empty
-2: empty
+$show b99
+fail: bike not found
+$set_km b99 100
+fail: bike not found
 $end
 ```
 
 ```bash
-#TEST_CASE fluxo_completo_rotativo
+#TEST_CASE listagem_geral_e_oficina_vazia
 
-$init 2
-$park 0 ABC1234
-$park 1 XYZ9876
-$show
-0: [ABC1234]
-1: [XYZ9876]
-$leave 0
-$show
-0: empty
-1: [XYZ9876]
-$park 0 KKK0001
-$show
-0: [KKK0001]
-1: [XYZ9876]
+$show_all
+fail: empty workshop
+$add_urbana u1 100
+success
+$add_eletrica e1 400 250
+success
+$show_all
+eletrica: e1, km: 400, potencia: 250W, cost: 180.0
+urbana: u1, km: 100, cost: 60.0
 $end
 ```
 

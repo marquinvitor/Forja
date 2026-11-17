@@ -1,97 +1,111 @@
+const val SUCCESS_MSG: String = "success"
+const val BIKE_ALREADY_EXISTS_MSG: String = "fail: bike already exists"
+const val BIKE_NOT_FOUND_MSG: String = "fail: bike not found"
+const val INVALID_KM_MSG: String = "fail: invalid km"
+const val EMPTY_WORKSHOP_MSG: String = "fail: empty workshop"
 const val INVALID_COMMAND_MSG: String = "fail: invalid command"
-const val INVALID_INDEX_MSG: String = "fail: invalid index"
-const val BAY_OCCUPIED_MSG: String = "fail: bay is already occupied"
-const val VEHICLE_ALREADY_PARKED_MSG: String = "fail: vehicle already parked"
-const val BAY_EMPTY_MSG: String = "fail: bay is empty"
 
-class Vehicle(private val plate: String = "") {
-    fun getPlate(): String {
-        return this.plate
+abstract class Bicicleta(codigo: String, quilometragem: Int) {
+    private var codigo: String = ""
+    private var quilometragem: Int = 0
+
+    init {
+        this.codigo = codigo
+        if (quilometragem >= 0) {
+            this.quilometragem = quilometragem
+        } else {
+            this.quilometragem = 0
+        }
+    }
+
+    fun getCodigo(): String {
+        return this.codigo
+    }
+
+    fun getQuilometragem(): Int {
+        return this.quilometragem
+    }
+
+    fun setQuilometragem(km: Int): Boolean {
+        if (km >= 0) {
+            this.quilometragem = km
+            return true
+        }
+        return false
+    }
+
+    abstract fun calcularRevisao(): Double
+
+    abstract override fun toString(): String
+}
+
+class BicicletaUrbana(codigo: String, quilometragem: Int) : Bicicleta(codigo, quilometragem) {
+    init {
+    }
+
+    override fun calcularRevisao(): Double {
+        return 50.0 + (this.getQuilometragem() * 0.10)
     }
 
     override fun toString(): String {
-        return "[${this.plate}]"
+        return "urbana: ${this.getCodigo()}, km: ${this.getQuilometragem()}, cost: ${this.calcularRevisao()}"
     }
 }
 
-class ParkingLot(private val capacity: Int = 0) {
-    private var bays: Array<Vehicle?> = arrayOfNulls<Vehicle>(capacity)
+class BicicletaEletrica(codigo: String, quilometragem: Int, potencia: Int) : Bicicleta(codigo, quilometragem) {
+    private var potencia: Int = 0
 
     init {
-        this.bays = arrayOfNulls<Vehicle>(this.capacity)
+        this.potencia = potencia
     }
 
-    fun getCapacity(): Int {
-        return this.capacity
+    fun getPotencia(): Int {
+        return this.potencia
     }
 
-    fun getVehicle(index: Int): Vehicle? {
-        if (index < 0 || index >= this.capacity) {
-            return null
+    override fun calcularRevisao(): Double {
+        var custo: Double = 100.0 + (this.getQuilometragem() * 0.20)
+        if (this.potencia > 250) {
+            custo += 50.0
         }
-        return this.bays[index]
-    }
-
-    fun findVehicle(plate: String): Int {
-        var i: Int = 0
-        while (i < this.capacity) {
-            val v: Vehicle? = this.bays[i]
-            if (v != null && v.getPlate() == plate) {
-                return i
-            }
-            i = i + 1
-        }
-        return -1
-    }
-
-    fun park(index: Int, vehicle: Vehicle): Boolean {
-        if (index < 0 || index >= this.capacity) {
-            throw IllegalArgumentException(INVALID_INDEX_MSG)
-        }
-        if (this.bays[index] != null) {
-            throw IllegalStateException(BAY_OCCUPIED_MSG)
-        }
-        if (this.findVehicle(vehicle.getPlate()) != -1) {
-            throw IllegalStateException(VEHICLE_ALREADY_PARKED_MSG)
-        }
-        this.bays[index] = vehicle
-        return true
-    }
-
-    fun leave(index: Int): Vehicle? {
-        if (index < 0 || index >= this.capacity) {
-            throw IllegalArgumentException(INVALID_INDEX_MSG)
-        }
-        val v: Vehicle? = this.bays[index]
-        if (v == null) {
-            throw IllegalStateException(BAY_EMPTY_MSG)
-        }
-        this.bays[index] = null
-        return v
+        return custo
     }
 
     override fun toString(): String {
-        var result: String = ""
-        var i: Int = 0
-        while (i < this.capacity) {
-            val v: Vehicle? = this.bays[i]
-            val line: String = if (v == null) {
-                "${i}: empty"
-            } else {
-                "${i}: ${v.toString()}"
-            }
-            if (i > 0) {
-                result = result + "\n"
-            }
-            result = result + line
-            i = i + 1
+        return "eletrica: ${this.getCodigo()}, km: ${this.getQuilometragem()}, potencia: ${this.potencia}W, cost: ${this.calcularRevisao()}"
+    }
+}
+
+class Oficina {
+    private val bicicletas: MutableMap<String, Bicicleta> = mutableMapOf()
+
+    fun adicionarBicicleta(bike: Bicicleta): Boolean {
+        if (this.bicicletas.containsKey(bike.getCodigo())) {
+            return false
         }
-        return result
+        this.bicicletas[bike.getCodigo()] = bike
+        return true
+    }
+
+    fun buscarBicicleta(codigo: String): Bicicleta? {
+        return this.bicicletas[codigo]
+    }
+
+    fun obterTodas(): List<Bicicleta> {
+        val chavesOrdenadas: List<String> = this.bicicletas.keys.sorted()
+        val resultado: MutableList<Bicicleta> = mutableListOf()
+        for (chave: String in chavesOrdenadas) {
+            val bike: Bicicleta? = this.bicicletas[chave]
+            if (bike != null) {
+                resultado.add(bike)
+            }
+        }
+        return resultado
     }
 }
 
 fun main(): Unit {
-    var parkingLot: ParkingLot = ParkingLot(0)
+    val oficina: Oficina = Oficina()
 
     while (true) {
         val line: String = readLine() ?: break
@@ -100,20 +114,48 @@ fun main(): Unit {
         val parts: List<String> = line.trim().split(Regex("\\s+"))
         when (parts[0]) {
             "end" -> break
-            "init" -> parkingLot = ParkingLot(parts[1].toInt())
-            "show" -> println(parkingLot)
-            "park" -> {
-                try {
-                    parkingLot.park(parts[1].toInt(), Vehicle(parts[2]))
-                } catch (e: Exception) {
-                    println(e.message)
+            "add_urbana" -> {
+                val bike: BicicletaUrbana = BicicletaUrbana(parts[1], parts[2].toInt())
+                if (oficina.adicionarBicicleta(bike)) {
+                    println(SUCCESS_MSG)
+                } else {
+                    println(BIKE_ALREADY_EXISTS_MSG)
                 }
             }
-            "leave" -> {
-                try {
-                    parkingLot.leave(parts[1].toInt())
-                } catch (e: Exception) {
-                    println(e.message)
+            "add_eletrica" -> {
+                val bike: BicicletaEletrica = BicicletaEletrica(parts[1], parts[2].toInt(), parts[3].toInt())
+                if (oficina.adicionarBicicleta(bike)) {
+                    println(SUCCESS_MSG)
+                } else {
+                    println(BIKE_ALREADY_EXISTS_MSG)
+                }
+            }
+            "set_km" -> {
+                val bike: Bicicleta? = oficina.buscarBicicleta(parts[1])
+                if (bike == null) {
+                    println(BIKE_NOT_FOUND_MSG)
+                } else if (bike.setQuilometragem(parts[2].toInt())) {
+                    println(SUCCESS_MSG)
+                } else {
+                    println(INVALID_KM_MSG)
+                }
+            }
+            "show" -> {
+                val bike: Bicicleta? = oficina.buscarBicicleta(parts[1])
+                if (bike == null) {
+                    println(BIKE_NOT_FOUND_MSG)
+                } else {
+                    println(bike)
+                }
+            }
+            "show_all" -> {
+                val bikes: List<Bicicleta> = oficina.obterTodas()
+                if (bikes.isEmpty()) {
+                    println(EMPTY_WORKSHOP_MSG)
+                } else {
+                    for (bike: Bicicleta in bikes) {
+                        println(bike)
+                    }
                 }
             }
             else -> println(INVALID_COMMAND_MSG)

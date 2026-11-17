@@ -1,10 +1,10 @@
 ---
 index_content: |2
-    - Descrição: Implementação de um carrinho de compras para uma padaria artesanal com controle de capacidade e cálculo de total.
-    - Domínio: Controle de itens, invariantes de quantidade/preço e capacidade máxima de pedidos em uma padaria.
-    - Objetivos: Praticar encapsulamento com invariantes e manipulação segura de coleções lineares em Kotlin.
+    - Descrição: Sistema de gerenciamento de empréstimos e acervo para uma biblioteca comunitária.
+    - Domínio: Controle de acervo literário e limites de empréstimo por associado.
+    - Objetivos: Praticar encapsulamento com invariantes, uso de mapas para indexação rápida e tratamento de exceções de domínio.
 ---
-# [TRAIN] Carrinho da Padaria Artesanal
+# [TRAIN] Biblioteca de Bairro
 
 <!-- toc-table -->
 
@@ -12,32 +12,67 @@ index_content: |2
 
 ## Intro
 
-Dona Odete abriu uma padaria artesanal famosa por suas fornadas limitadas de pães de fermentação natural, croissants folhados e cafés especiais. Como os produtos são frescos e a cozinha opera sob demanda, cada cliente pode incluir apenas uma quantidade limitada de variedades no seu carrinho de pedidos de cada vez, garantindo que a equipe consiga embalar tudo no ponto certo.
+Dona Clara é a zelosa coordenadora da Biblioteca Popular da Vila das Flores, um espaço comunitário mantido com doações de livros para incentivar a leitura entre jovens e adultos do bairro. Durante anos, todo o controle foi feito em um velho caderno espiral: anotações de quem pegou qual livro, datas improvisadas e rasuras nas margens. Recentemente, com o aumento no número de leitores e o sumiço de obras raras, a situação ficou insustentável: sócios pegavam mais livros do que podiam cuidar e outros tentavam retirar títulos que já estavam emprestados.
 
-Para evitar erros em que itens sejam registrados com preços zerados, quantidades nulas ou pedidos ultrapassando a capacidade do balcão de montagem, Dona Odete encomendou um sistema em Kotlin estruturado em duas classes com encapsulamento rigoroso:
+Para resolver de vez o descontrole, Dona Clara pediu sua ajuda para construir um sistema em Kotlin robusto e seguro. O sistema deve impedir que as regras do negócio sejam violadas por meio de encapsulamento rígido e sinalização de falhas via exceções.
 
-- **Item**: Representa um produto adicionado ao pedido.
-  - Atributos privados: `name` (String), `price` (Double) e `quantity` (Int).
-  - Garante a invariante de que o preço deve ser estritamente positivo (`price > 0.0`) e a quantidade deve ser maior que zero (`quantity > 0`).
-  - Métodos de acesso para leitura dos atributos, método `setQuantity(quantity: Int): Boolean` para validação de alterações, `getTotal(): Double` para o subtotal do item e `toString(): String` formatado como `nome: preco x quantidade`.
+O sistema é estruturado em três classes de domínio:
 
-- **Cart**: Representa o carrinho de compras do cliente.
-  - Atributos privados: `items` (`MutableList<Item>`) e `maxCapacity` (`Int`).
-  - `addItem(item: Item): Boolean`: Adiciona o item caso a lista ainda não tenha atingido a capacidade máxima definida.
-  - `removeItem(index: Int): Boolean`: Remove o item do carrinho baseado na posição indicada pela lista, retornando falso caso o índice não exista.
-  - `getTotalValue(): Double`: Calcula a soma acumulada de todos os subtotais dos itens contidos.
-  - `toString(): String`: Formata o resumo do carrinho como `cart: [item1, item2], total: valor`.
+- **`Livro`**: Representa uma obra literária do acervo.
+  - Atributos: `titulo` (String) e `emprestado` (Boolean, privado com alteração restrita).
+  - Construtor: recebe o título da obra e inicializa seu estado como não emprestado (`false`).
+  - Métodos:
+    - `getTitulo(): String`: retorna o título do livro.
+    - `isEmprestado(): Boolean`: indica se a obra está atualmente emprestada.
+    - `emprestar(): Boolean`: se o livro já estiver emprestado, retorna `false`; caso contrário, marca como emprestado e retorna `true`.
+    - `devolver(): Boolean`: se o livro não estiver emprestado, retorna `false`; caso contrário, marca como não emprestado e retorna `true`.
+    - `toString(): String`: formata a representação textual do livro (ex.: `Dom_Casmurro [disponivel]` ou `Dom_Casmurro [emprestado]`).
 
-As classes de domínio não imprimem mensagens; elas apenas operam o estado interno e devolvem respostas booleanas ou valores calculados. O Shell (`main`) interpreta as entradas do usuário, invoca os métodos e exibe erros prefixados com `fail: ` quando alguma operação for recusada.
+- **`Socio`**: Representa um membro cadastrado da biblioteca.
+  - Atributos: `cpf` (String), `limite` (Int, quantidade máxima de livros simultâneos) e `livros` (MutableList privada de livros atualmente em posse do sócio).
+  - Construtor: recebe o CPF e o limite máximo de livros.
+  - Métodos:
+    - `getCpf(): String`: retorna o CPF do sócio.
+    - `getLimite(): Int`: retorna o limite de empréstimos.
+    - `getLivros(): List<Livro>`: retorna uma visualização imutável da lista de livros emprestados.
+    - `podeEmprestar(): Boolean`: retorna `true` se o número de livros emprestados for estritamente menor que o limite.
+    - `adicionarLivro(livro: Livro): Boolean`: adiciona o livro se `podeEmprestar()` for verdadeiro, retornando `true`; caso contrário, retorna `false`.
+    - `removerLivro(titulo: String): Livro?`: se o sócio estiver com o livro de determinado título, remove-o e o retorna; caso contrário, retorna `null`.
+    - `temLivro(titulo: String): Boolean`: verifica se o sócio possui atualmente o livro com o título informado.
+    - `toString(): String`: formata o sócio no padrão `socio: <cpf> [limite: <limite>, emprestados: [<titulo1>, <titulo2>]]`.
+
+- **`Biblioteca`**: Responsável por orquestrar os cadastros e as regras de negócio.
+  - Atributos: `socios` (Map indexado pelo CPF) e `livros` (Map indexado pelo título).
+  - Construtor: inicializa os mapas de sócios e livros vazios (usando coleções que preservam a ordem de inserção).
+  - Métodos:
+    - `cadastrarSocio(cpf: String, limite: Int)`: cadastra um novo sócio. Lança `IllegalArgumentException("socio already exists")` se o CPF já estiver cadastrado.
+    - `cadastrarLivro(titulo: String)`: cadastra um novo livro no acervo. Lança `IllegalArgumentException("livro already exists")` se já houver obra com aquele título.
+    - `emprestar(cpf: String, titulo: String)`:
+      - Lança `IllegalArgumentException("socio nao encontrado")` se o sócio não existir.
+      - Lança `IllegalArgumentException("livro nao encontrado")` se o livro não existir no acervo.
+      - Lança `IllegalStateException("livro indisponivel")` se o livro já estiver emprestado.
+      - Lança `IllegalStateException("limite de emprestimos excedido")` se o sócio tiver atingido seu limite.
+      - Caso todas as condições sejam atendidas, atualiza o estado do livro e insere-o na lista do sócio.
+    - `devolver(cpf: String, titulo: String)`:
+      - Lança `IllegalArgumentException("socio nao encontrado")` se o sócio não existir.
+      - Lança `IllegalArgumentException("livro nao encontrado")` se o livro não existir no acervo.
+      - Lança `IllegalStateException("socio nao possui este livro")` se o sócio não estiver em posse da obra informada.
+      - Caso válido, remove o livro da posse do sócio e marca o livro como disponível.
+    - `toString(): String`: lista todos os sócios (um por linha) e, em seguida, todos os livros do acervo (um por linha). Se não houver itens, nada é impresso nessa respectiva seção.
+
+- **Shell / `Main`**:
+  - Lê comandos do terminal, executa as operações e captura exceções imprimindo `fail: <mensagem>`.
+  - Comandos que realizam mutação com sucesso executam de forma silenciosa.
 
 ## Regras
 
-- Preços e quantidades de itens devem ser estritamente maiores que zero; qualquer tentativa de criar ou alterar para valores menores ou iguais a zero é rejeitada com `fail: invalid item`.
-- A capacidade máxima do carrinho é fixada na inicialização via comando `init` e não pode ser ultrapassada.
-- Se o carrinho já estiver na capacidade máxima ao tentar adicionar um item válido, a operação é rejeitada com `fail: cart is full`.
-- A remoção de itens deve verificar os limites do índice da coleção (`0 <= index < items.size`); tentativas com índices inválidos são rejeitadas com `fail: invalid index`.
-- O valor total do carrinho deve refletir a soma exata de `price * quantity` de todos os itens cadastrados no momento.
-- A lista interna de itens do carrinho deve ser protegida contra modificações externas acidentais (encapsulamento de coleção).
+- O acervo e os sócios devem ser armazenados internamente na `Biblioteca` utilizando estruturas de mapa (`Map`).
+- A ordem de inserção dos sócios e livros deve ser preservada na listagem (`LinkedHashMap`).
+- Nenhuma classe de modelo (`Livro`, `Socio`, `Biblioteca`) deve imprimir mensagens diretamente no console.
+- A invariante do sócio não pode ser violada: o total de empréstimos ativos nunca pode exceder o seu limite.
+- A biblioteca deve lançar `IllegalArgumentException` para cadastros duplicados ou entidades não encontradas.
+- A biblioteca deve lançar `IllegalStateException` para violações de estado operacional (livro indisponível, limite atingido ou livro não associado ao sócio).
+- Falhas capturadas pelo Shell devem ser exibidas obrigatoriamente com o prefixo `fail: `.
 
 ## Diagrama
 
@@ -46,131 +81,179 @@ As classes de domínio não imprimem mensagens; elas apenas operam o estado inte
 classDiagram
     direction TB
 
-    class Item {
-        -name : String
-        -price : Double
-        -quantity : Int
-        +Item(name : String, price : Double, quantity : Int)
-        +getName() String
-        +getPrice() Double
-        +getQuantity() Int
-        +setQuantity(quantity : Int) Boolean
-        +getTotal() Double
+    class Livro {
+        -titulo : String
+        -emprestado : Boolean
+        +Livro(titulo : String)
+        +getTitulo() String
+        +isEmprestado() Boolean
+        +emprestar() Boolean
+        +devolver() Boolean
         +toString() String
     }
 
-    class Cart {
-        -items : MutableList~Item~
-        -maxCapacity : Int
-        +Cart(maxCapacity : Int)
-        +addItem(item : Item) Boolean
-        +removeItem(index : Int) Boolean
-        +getTotalValue() Double
-        +getItems() List~Item~
+    class Socio {
+        -cpf : String
+        -limite : Int
+        -livros : List~Livro~
+        +Socio(cpf : String, limite : Int)
+        +getCpf() String
+        +getLimite() Int
+        +getLivros() List~Livro~
+        +podeEmprestar() Boolean
+        +adicionarLivro(livro : Livro) Boolean
+        +removerLivro(titulo : String) Livro?
+        +temLivro(titulo : String) Boolean
+        +toString() String
+    }
+
+    class Biblioteca {
+        -socios : Map~String, Socio~
+        -livros : Map~String, Livro~
+        +Biblioteca()
+        +cadastrarSocio(cpf : String, limite : Int) Unit
+        +cadastrarLivro(titulo : String) Unit
+        +emprestar(cpf : String, titulo : String) Unit
+        +devolver(cpf : String, titulo : String) Unit
         +toString() String
     }
 
     class Main {
-        +main() Unit
+        +main(args : Array~String~) Unit$
     }
 
-    Cart "1" *-- "0..*" Item : contains
-    Main ..> Cart : manages
-    Main ..> Item : creates
+    Biblioteca "1" *-- "*" Socio : gerencia
+    Biblioteca "1" *-- "*" Livro : acervo
+    Socio o-- "*" Livro : possui
+    Main ..> Biblioteca : utiliza
 ```
 
 ## Guide
 
-* **Passo 1**: Crie a classe `Item`. Defina o construtor primário com atributos privados e implemente a validação: se `price <= 0.0` ou `quantity <= 0`, lance uma exceção apropriada (ex: `IllegalArgumentException`) ou utilize um método fábrica/validador prévio. Garanta que `setQuantity` só altere o atributo se a nova quantidade for estritamente positiva.
-* **Passo 2**: Implemente o método `getTotal(): Double` na classe `Item`, retornando `price * quantity`, além de sobrescrever `toString()` gerando a representação `name: price x quantity`.
-* **Passo 3**: Crie a classe `Cart` contendo `private val items = mutableListOf<Item>()` e `private val maxCapacity: Int`. Implemente `addItem`, garantindo que só insira se `items.size < maxCapacity`. Implemente `removeItem` checando se `index in items.indices`.
-* **Passo 4**: Implemente `getTotalValue()` utilizando funções de agregação como `.sumOf { it.getTotal() }` e implemente `toString()` formatando a lista de itens e o total acumulado.
-* **Passo 5**: Construa o laço do `main` lendo os comandos via `Scanner` ou `readLine()`. Ao ler `$add`, valide o item antes; se for inválido, emita `fail: invalid item`. Se válido, tente inseri-lo no carrinho e emita `fail: cart is full` caso o carrinho atinja o limite.
+* **Passo 1 (`Livro`)**: Crie a classe `Livro` com o atributo `titulo` imutável e a flag `emprestado` com visibilidade privada para alteração (`private set`). Implemente os métodos `emprestar()` e `devolver()`, garantindo que alterem a flag e retornem `true` apenas se a transição de estado for viável.
+* **Passo 2 (`Socio`)**: Crie a classe `Socio` mantendo a lista interna de livros privada. O método `getLivros()` deve retornar uma referência de leitura imutável (`toList()`). Certifique-se de que `adicionarLivro()` consulte `podeEmprestar()` antes de aceitar uma nova obra, protegendo a invariante do limite de empréstimos.
+* **Passo 3 (`Biblioteca`)**: Crie a classe `Biblioteca` utilizando `mutableMapOf<String, Socio>()` e `mutableMapOf<String, Livro>()`. No método `emprestar()`, valide as quatro condições na ordem estipulada (existência de sócio, existência de livro, disponibilidade do livro e capacidade do sócio), disparando as exceções adequadas (`IllegalArgumentException` e `IllegalStateException`).
+* **Passo 4 (`Main`)**: Monte o laço interativo do Shell. Utilize um bloco `try / catch (e: Exception)` ao redor do processamento de cada linha para capturar as exceções das regras de negócio e exibir `fail: ${e.message}`. Adicione o comando `show` para invocar o `toString()` da biblioteca.
 
 Perguntas de reflexão:
-1. Por que expor `getItems(): List<Item>` (visão somente leitura) é mais seguro do que expor a `MutableList<Item>` diretamente?
-2. Como a separação entre validar o item e validar a lotação do carrinho facilita a manutenção e reutilização do código?
+1. Por que a responsabilidade de lançar exceções com mensagens de negócio ficou na classe `Biblioteca`, enquanto `Livro` e `Socio` retornam booleanos ou nulos em suas operações atômicas?
+2. Como a utilização de mapas (`Map`) por chave primária (CPF e título) altera a complexidade de tempo de busca em relação a uma busca linear em listas?
 
 ## Shell
 
 ```bash
-#TEST_CASE inicializacao_e_adicao
+#TEST_CASE cadastro_e_exibicao
 
-$init 3
-$add bread 5.0 2
-$add coffee 10.0 1
 $show
-cart: [bread: 5.0 x 2, coffee: 10.0 x 1], total: 20.0
+$add_socio 111 2
+$add_socio 222 1
+$add_livro Dom_Casmurro
+$add_livro O_Hobbit
+$show
+socio: 111 [limite: 2, emprestados: []]
+socio: 222 [limite: 1, emprestados: []]
+livro: Dom_Casmurro [disponivel]
+livro: O_Hobbit [disponivel]
 $end
 ```
 
 ```bash
-#TEST_CASE capacidade_maxima
+#TEST_CASE duplicidade_e_preservacao
 
-$init 2
-$add bread 5.0 1
-$add coffee 10.0 1
-$add cake 20.0 1
-fail: cart is full
+$add_socio 111 2
+$add_socio 111 3
+fail: socio already exists
+$add_livro Dom_Casmurro
+$add_livro Dom_Casmurro
+fail: livro already exists
 $show
-cart: [bread: 5.0 x 1, coffee: 10.0 x 1], total: 15.0
+socio: 111 [limite: 2, emprestados: []]
+livro: Dom_Casmurro [disponivel]
 $end
 ```
 
 ```bash
-#TEST_CASE item_invalido
+#TEST_CASE fluxo_emprestimo_e_devolucao
 
-$init 2
-$add bread 0.0 2
-fail: invalid item
-$add cookie 4.5 0
-fail: invalid item
-$add cake -3.0 1
-fail: invalid item
+$add_socio 111 2
+$add_livro Dom_Casmurro
+$add_livro O_Hobbit
+$emprestar 111 Dom_Casmurro
 $show
-cart: [], total: 0.0
+socio: 111 [limite: 2, emprestados: [Dom_Casmurro]]
+livro: Dom_Casmurro [emprestado]
+livro: O_Hobbit [disponivel]
+$devolver 111 Dom_Casmurro
+$show
+socio: 111 [limite: 2, emprestados: []]
+livro: Dom_Casmurro [disponivel]
+livro: O_Hobbit [disponivel]
 $end
 ```
 
 ```bash
-#TEST_CASE remocao_e_fronteira
+#TEST_CASE falhas_de_entidade_e_disponibilidade
 
-$init 3
-$add bread 5.0 2
-$add coffee 10.0 1
-$remove 5
-fail: invalid index
-$remove -1
-fail: invalid index
-$remove 0
+$add_socio 111 2
+$add_socio 222 2
+$add_livro O_Hobbit
+$emprestar 999 O_Hobbit
+fail: socio nao encontrado
+$emprestar 111 Livro_Fantasma
+fail: livro nao encontrado
+$emprestar 111 O_Hobbit
+$emprestar 222 O_Hobbit
+fail: livro indisponivel
 $show
-cart: [coffee: 10.0 x 1], total: 10.0
-$remove 0
-$show
-cart: [], total: 0.0
-$remove 0
-fail: invalid index
+socio: 111 [limite: 2, emprestados: [O_Hobbit]]
+socio: 222 [limite: 2, emprestados: []]
+livro: O_Hobbit [emprestado]
 $end
 ```
 
 ```bash
-#TEST_CASE fluxo_completo_rotatividade
+#TEST_CASE limite_de_emprestimos_e_fronteira
 
-$init 2
+$add_socio 333 1
+$add_livro Livro_A
+$add_livro Livro_B
+$emprestar 333 Livro_A
+$emprestar 333 Livro_B
+fail: limite de emprestimos excedido
 $show
-cart: [], total: 0.0
-$add croissant 7.5 2
-$add juice 8.0 1
+socio: 333 [limite: 1, emprestados: [Livro_A]]
+livro: Livro_A [emprestado]
+livro: Livro_B [disponivel]
+$devolver 333 Livro_A
+$emprestar 333 Livro_B
 $show
-cart: [croissant: 7.5 x 2, juice: 8.0 x 1], total: 23.0
-$add bagel 6.0 1
-fail: cart is full
-$remove 0
+socio: 333 [limite: 1, emprestados: [Livro_B]]
+livro: Livro_A [disponivel]
+livro: Livro_B [emprestado]
+$end
+```
+
+```bash
+#TEST_CASE devolucao_invalida
+
+$add_socio 111 2
+$add_socio 222 2
+$add_livro Livro_A
+$add_livro Livro_B
+$emprestar 111 Livro_A
+$devolver 999 Livro_A
+fail: socio nao encontrado
+$devolver 111 Livro_Inexistente
+fail: livro nao encontrado
+$devolver 111 Livro_B
+fail: socio nao possui este livro
+$devolver 222 Livro_A
+fail: socio nao possui este livro
 $show
-cart: [juice: 8.0 x 1], total: 8.0
-$add bagel 6.0 2
-$show
-cart: [juice: 8.0 x 1, bagel: 6.0 x 2], total: 20.0
+socio: 111 [limite: 2, emprestados: [Livro_A]]
+socio: 222 [limite: 2, emprestados: []]
+livro: Livro_A [emprestado]
+livro: Livro_B [disponivel]
 $end
 ```
 

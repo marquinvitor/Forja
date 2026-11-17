@@ -1,1 +1,1 @@
-1 classe, com encapsulamento e invariantes, no contexto de uma garrafa térmica inteligente que controla volume de líquido, capacidade máxima e temperatura, com métodos para abastecer e servir sem permitir transbordamento nem valores negativos
+2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total
