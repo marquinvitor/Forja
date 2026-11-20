@@ -141,6 +141,87 @@ def salvar_questao(output_dir: str, nome: str, readme: str, solucao: str, esquel
     print("⚠ Falta adicionar a capa: assets/cover.webp")
 
 
+# ─── Verificador de Integridade do Esqueleto (shell.kt) ──────────────────────
+
+def analisar_metodos_classes(codigo: str) -> list[tuple[str, str]]:
+    """
+    Analisa os métodos de classes declarados antes da função main,
+    utilizando contagem de chaves balanceadas para suportar corpos complexos.
+    Retorna uma lista de tuplas (nome_do_metodo, corpo_completo).
+    """
+    pos_main = codigo.find("fun main")
+    bloco = codigo[:pos_main] if pos_main != -1 else codigo
+
+    linhas = bloco.splitlines()
+    metodos = []
+    em_metodo = False
+    nome_atual = ""
+    corpo_atual = []
+    nivel_chaves = 0
+    viu_abertura = False
+
+    for linha in linhas:
+        l = linha.strip()
+        if not em_metodo:
+            if (l.startswith("fun ") or l.startswith("override fun ")) and "(" in l and ":" in l:
+                termo = "override fun " if l.startswith("override fun ") else "fun "
+                nome_atual = l.split(termo)[1].split("(")[0].strip()
+                em_metodo = True
+                viu_abertura = "{" in l
+                nivel_chaves = l.count("{") - l.count("}")
+                corpo_atual = [l]
+                if viu_abertura and nivel_chaves <= 0:
+                    metodos.append((nome_atual, "\n".join(corpo_atual)))
+                    em_metodo = False
+                    nome_atual = ""
+                    corpo_atual = []
+                    viu_abertura = False
+        else:
+            corpo_atual.append(l)
+            if "{" in l:
+                viu_abertura = True
+            nivel_chaves += l.count("{") - l.count("}")
+            if viu_abertura and nivel_chaves <= 0:
+                metodos.append((nome_atual, "\n".join(corpo_atual)))
+                em_metodo = False
+                nome_atual = ""
+                corpo_atual = []
+                viu_abertura = False
+    return metodos
+
+
+def verificar_conformidade_esqueleto(shell_codigo: str) -> tuple[bool, str]:
+    """
+    Verifica se o esqueleto (shell.kt) obedece à regra do sistema Forja:
+    1. Não pode estar sem TODOs (regra global da linha 712 de forja.py).
+    2. Métodos de domínio das classes não podem vir implementados com código pronto
+       (devem conter apenas TODO(...) no corpo).
+    """
+    if "TODO" not in shell_codigo:
+        return False, (
+            "O main.kt entregue não é um esqueleto: não contém nenhum TODO. "
+            "Os métodos das classes devem ter apenas TODO(\"...\") no corpo; só a função main fica completa."
+        )
+
+    metodos = analisar_metodos_classes(shell_codigo)
+    violacoes = []
+    for nome, corpo in metodos:
+        if "TODO" not in corpo:
+            violacoes.append(f"Método '{nome}' foi implementado com código pronto (sem TODO).")
+
+    if violacoes:
+        msg = (
+            "Violação das regras de esqueleto (shell.kt):\n"
+            + "\n".join(f"  * {v}" for v in violacoes)
+            + "\nDiagnóstico: Nas classes do esqueleto para os alunos, nenhum método deve vir com "
+              "implementação pronta. Todos os métodos das classes devem conter estritamente TODO(\"...\") "
+              "em seu corpo; apenas a função main deve permanecer implementada."
+        )
+        return False, msg
+
+    return True, "Esqueleto conforme: todos os métodos das classes contêm TODO."
+
+
 # ─── compilação e execução do Kotlin ─────────────────────────────────────────
 
 def _normalizar(saida: str) -> str:
@@ -709,10 +790,9 @@ def main():
     for tentativa in range(1, MAX_TENTATIVAS + 1):
         print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
 
-        if "TODO" not in shell_atual:
-            # o esqueleto veio com a lógica pronta: não há nada para o aluno implementar
-            diagnostico = ("O main.kt entregue não é um esqueleto: não contém nenhum TODO. Os métodos das classes devem ter "
-                           "apenas TODO(\"...\") no corpo; só a função main fica completa.")
+        ok_esqueleto, diag_esqueleto = verificar_conformidade_esqueleto(shell_atual)
+        if not ok_esqueleto:
+            diagnostico = diag_esqueleto
             gabarito_atual = ""
         else:
             crew_auditoria = Crew(agents=[auditor_tecnico],
@@ -731,6 +811,12 @@ def main():
                 print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
                 diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
             else:
+                # Garante que a função main do gabarito preserva rigorosamente a do esqueleto (regra de auditoria)
+                pos_main_shell = shell_atual.find("fun main")
+                pos_main_gab = gabarito_atual.find("fun main")
+                if pos_main_shell != -1 and pos_main_gab != -1:
+                    gabarito_atual = gabarito_atual[:pos_main_gab] + shell_atual[pos_main_shell:]
+
                 print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
                 resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
                 diagnostico = formatar_relatorio(resultado)
