@@ -1,9 +1,11 @@
+import copy
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from crewai import Agent, Task, Crew, Process, LLM
 import litellm
@@ -28,6 +30,46 @@ MAX_TENTATIVAS = 3
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY não encontrada no .env")
 
+# Tabela de fallback de preços (em USD por 1 milhão de tokens) conforme tabela oficial do Google AI Studio
+PRECOS_FALLBACK_1M = {
+    "gemini-3.5-flash-lite": {"input": 0.075, "output": 0.30},
+    "gemini/gemini-3.5-flash-lite": {"input": 0.075, "output": 0.30},
+    "gemini-3.8-flash": {"input": 0.15, "output": 0.60},
+    "gemini/gemini-3.8-flash": {"input": 0.15, "output": 0.60},
+}
+
+registro_custos = {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "custo_usd": 0.0,
+    "chamadas": 0,
+    "por_modelo": {}
+}
+
+def resetar_custos() -> dict:
+    """Zera e retorna a estrutura registro_custos."""
+    global registro_custos
+    registro_custos.clear()
+    registro_custos.update({
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "custo_usd": 0.0,
+        "chamadas": 0,
+        "por_modelo": {}
+    })
+    return registro_custos
+
+def _calcular_custo_fallback(modelo: str, prompt_tokens: int, completion_tokens: int) -> float:
+    tabela = PRECOS_FALLBACK_1M.get(modelo)
+    if not tabela:
+        modelo_limpo = modelo.split("/")[-1] if "/" in modelo else modelo
+        tabela = PRECOS_FALLBACK_1M.get(modelo_limpo, {"input": 0.15, "output": 0.60})
+    preco_in = tabela.get("input", 0.0)
+    preco_out = tabela.get("output", 0.0)
+    return (prompt_tokens * preco_in + completion_tokens * preco_out) / 1_000_000.0
+
 # gambiarra pra nao usar cache
 litellm.cache = None
 _orig_completion = litellm.completion
@@ -41,20 +83,96 @@ def _safe_completion(**kwargs):
             for bloco in msg["content"]:
                 if isinstance(bloco, dict):
                     bloco.pop("cache_control", None)
-    return _orig_completion(**kwargs)
+
+    resposta = _orig_completion(**kwargs)
+
+    try:
+        usage = getattr(resposta, "usage", None)
+        p_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        c_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        t_tokens = int(getattr(usage, "total_tokens", p_tokens + c_tokens) or (p_tokens + c_tokens))
+
+        modelo_req = kwargs.get("model", "")
+        modelo_resp = getattr(resposta, "model", None) or modelo_req or "desconhecido"
+
+        custo = None
+        try:
+            custo = litellm.completion_cost(completion_response=resposta)
+        except Exception:
+            custo = None
+
+        if custo is None or not isinstance(custo, (int, float)):
+            custo = _calcular_custo_fallback(modelo_resp, p_tokens, c_tokens)
+
+        registro_custos["prompt_tokens"] += p_tokens
+        registro_custos["completion_tokens"] += c_tokens
+        registro_custos["total_tokens"] += t_tokens
+        registro_custos["custo_usd"] += custo
+        registro_custos["chamadas"] += 1
+
+        chave_modelo = modelo_req if modelo_req else modelo_resp
+        detalhe = registro_custos["por_modelo"].setdefault(chave_modelo, {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "custo_usd": 0.0,
+            "chamadas": 0,
+        })
+        detalhe["prompt_tokens"] += p_tokens
+        detalhe["completion_tokens"] += c_tokens
+        detalhe["total_tokens"] += t_tokens
+        detalhe["custo_usd"] += custo
+        detalhe["chamadas"] += 1
+    except Exception as err:
+        print(f"⚠ Aviso ao rastrear custo/tokens: {err}")
+
+    return resposta
 
 litellm.completion = _safe_completion
 os.environ["CREWAI_DISABLE_PROMPT_CACHING"] = "true"
 
+# Garante que LLM instanciado com CrewAI utilize LiteLLM para ser interceptado por _safe_completion
+_orig_llm_new = LLM.__new__
+def _custom_llm_new(cls, model: str, is_litellm: bool = True, **kwargs):
+    if "api_key" not in kwargs and GEMINI_API_KEY:
+        kwargs["api_key"] = GEMINI_API_KEY
+    return _orig_llm_new(cls, model, is_litellm=is_litellm, **kwargs)
+
+LLM.__new__ = _custom_llm_new
+
 
 # ─── blocos de texto gerados pelos agentes ───────────────────────────────────
 
-def _limpar_cercas_markdown(texto: str) -> str:
-    """tira aqueles marcadores ```kotlin ... que ficavam saindo nos blocos"""
+def _limpar_cercas_markdown(texto: str, apenas_par_externo: bool = False) -> str:
+    """Remove cercas externas (ex.: ```kotlin ... ```) sem remover o fechamento ```
+    de blocos internos (ex.: ```bash no final de um README)."""
     texto = texto.strip()
-    texto = re.sub(r"^```[a-zA-Z0-9_-]*[ \t]*\n?", "", texto)
-    texto = re.sub(r"\n?```[ \t]*$", "", texto)
-    return texto.strip()
+    if not texto:
+        return ""
+
+    linhas = texto.splitlines()
+    abertura_re = re.compile(r"^```[a-zA-Z0-9_-]*[ \t]*$")
+    fechamento_re = re.compile(r"^```[ \t]*$")
+
+    tem_abertura = bool(abertura_re.match(linhas[0]))
+    tem_fechamento = len(linhas) > 1 and bool(fechamento_re.match(linhas[-1]))
+
+    if tem_abertura and tem_fechamento:
+        cercas_internas = sum(1 for l in linhas[1:-1] if l.lstrip().startswith("```"))
+        if cercas_internas % 2 == 0:
+            return "\n".join(linhas[1:-1]).strip()
+
+    if apenas_par_externo:
+        return texto
+
+    if tem_abertura:
+        linhas = linhas[1:]
+    elif tem_fechamento:
+        cercas_totais = sum(1 for l in linhas if l.lstrip().startswith("```"))
+        if cercas_totais % 2 == 1:
+            linhas = linhas[:-1]
+
+    return "\n".join(linhas).strip()
 
 
 def extrair_bloco(texto: str, marcador: str) -> str:
@@ -63,7 +181,7 @@ def extrair_bloco(texto: str, marcador: str) -> str:
     if inicio == -1 or fim == -1:
         return ""
     bruto = texto[inicio + len(f"<<<{marcador}>>>"):fim].strip()
-    return _limpar_cercas_markdown(bruto)
+    return _limpar_cercas_markdown(bruto, apenas_par_externo=(marcador == "README"))
 
 
 def extrair_codigo(texto: str, marcador: str) -> str:
@@ -637,30 +755,27 @@ Use EXATAMENTE estes marcadores (sem cercas markdown em volta dos blocos):
     )
 
 
-def main():
-    # Input do usuario
+def executar_geracao(
+    descricao: str,
+    nome_questao: str,
+    topicos: list[str],
+    exemplos: str,
+    pasta_base: Path = OUTPUT_DIR
+) -> dict:
+    """
+    Executa o ciclo completo de geração e auditoria técnica de uma questão POO.
+    Retorna métricas de aprovação, pass@1, tempo, custos e caminhos dos arquivos.
+    """
+    pasta_base = Path(pasta_base)
+    resetar_custos()
+    t_inicio = time.time()
 
-    print("=== Gerador de Questões POO (Kotlin) ===\n")
-    print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
-    descricao = input(
-        "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
-    ).strip()
     tipo = TIPO_ATIVIDADE
-    nome_questao = input("Nome da pasta de saída: ").strip().replace(" ", "_") or "questao"
-
-    print("\nAnalisando tópicos e carregando exemplos do repositório...")
-    topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
-    # Para fixar os tópicos manualmente (sem detecção automática), use:
-    # topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
-    #                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
-
-    topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos)
+    topicos_txt = ", ".join(TOPICOS[t]["titulo"] for t in topicos if t in TOPICOS)
+    if not topicos_txt:
+        topicos_txt = ", ".join(topicos)
     contexto_usuario = descricao
     entrada_usuario = descricao
-
-    confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
-    if confirma == "n":
-        raise SystemExit(0)
 
     # ─── tasks ──────────────────────────────────────────────────────
 
@@ -763,8 +878,7 @@ def main():
     )
 
     print("\nGerando questão...\n")
-    if not kickoff_seguro(equipe, "geração do rascunho inicial"):
-        raise SystemExit(1)
+    kickoff_ok = kickoff_seguro(equipe, "geração do rascunho inicial")
 
     saida_arquivos = str(tarefa_arquivos.output) if tarefa_arquivos.output else ""
     saida_shell    = str(tarefa_shell.output) if tarefa_shell.output else ""
@@ -772,103 +886,157 @@ def main():
     readme_atual = extrair_bloco(saida_arquivos, "README")
     shell_atual  = extrair_codigo(saida_shell, "SHELL")
 
-    if not (readme_atual and shell_atual and extrair_testes_readme(readme_atual)):
-        print("\nFaltou algum bloco (README, SHELL) ou o README não tem casos de teste válidos.")
-        print("\n--- Saída bruta (README) ---\n" + saida_arquivos)
-        print("\n--- Saída bruta (SHELL) ---\n" + saida_shell)
-        raise SystemExit(1)
-
-
-    # ─── ciclo de auditoria e correção ───────────────────────────────────────────
-    # a cada tentativa: gera a solução a partir do esqueleto, compila e executa contra os testes do README.
-    # se falhar, manda o diagnóstico pro especialista_poo corrigir, e tenta de novo.
-
     aprovado = False
+    pass_at_1 = False
+    tentativas_usadas = 0
     gabarito_atual = ""
     diagnostico = ""
 
-    for tentativa in range(1, MAX_TENTATIVAS + 1):
-        print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
+    if not kickoff_ok or not (readme_atual and shell_atual and extrair_testes_readme(readme_atual)):
+        print("\nFaltou algum bloco (README, SHELL) ou o README não tem casos de teste válidos.")
+        print("\n--- Saída bruta (README) ---\n" + saida_arquivos)
+        print("\n--- Saída bruta (SHELL) ---\n" + saida_shell)
+        diagnostico = "Falha na geração inicial: blocos README/SHELL ausentes ou sem testes válidos."
+    else:
+        # ─── ciclo de auditoria e correção ───────────────────────────────────────────
+        for tentativa in range(1, MAX_TENTATIVAS + 1):
+            tentativas_usadas = tentativa
+            print(f"\n=== Auditoria técnica — tentativa {tentativa}/{MAX_TENTATIVAS} ===")
 
-        ok_esqueleto, diag_esqueleto = verificar_conformidade_esqueleto(shell_atual)
-        if not ok_esqueleto:
-            diagnostico = diag_esqueleto
-            gabarito_atual = ""
-        else:
-            crew_auditoria = Crew(agents=[auditor_tecnico],
-                                  tasks=[criar_tarefa_gabarito(readme_atual, shell_atual)],
-                                  process=Process.sequential)
-            tarefa_gabarito = crew_auditoria.tasks[0]
-            if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
-                diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
+            ok_esqueleto, diag_esqueleto = verificar_conformidade_esqueleto(shell_atual)
+            if not ok_esqueleto:
+                diagnostico = diag_esqueleto
+                gabarito_atual = ""
+            else:
+                crew_auditoria = Crew(
+                    agents=[auditor_tecnico],
+                    tasks=[criar_tarefa_gabarito(readme_atual, shell_atual)],
+                    process=Process.sequential
+                )
+                tarefa_gabarito = crew_auditoria.tasks[0]
+                if not kickoff_seguro(crew_auditoria, f"gabarito (tentativa {tentativa})"):
+                    diagnostico = diagnostico or "Ciclo interrompido por erro de API antes de concluir a auditoria."
+                    break
+
+                saida_auditor = str(tarefa_gabarito.output) if tarefa_gabarito.output else ""
+                gabarito_atual = extrair_codigo(saida_auditor, "GABARITO")
+
+                if not gabarito_atual:
+                    print("Auditor não retornou um bloco <<<GABARITO>>> válido. Início da resposta recebida:")
+                    print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
+                    diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+                else:
+                    # Garante que a função main do gabarito preserva rigorosamente a do esqueleto
+                    pos_main_shell = shell_atual.find("fun main")
+                    pos_main_gab = gabarito_atual.find("fun main")
+                    if pos_main_shell != -1 and pos_main_gab != -1:
+                        gabarito_atual = gabarito_atual[:pos_main_gab] + shell_atual[pos_main_shell:]
+
+                    print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
+                    resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
+                    diagnostico = formatar_relatorio(resultado)
+
+                    if resultado["etapa"] == "ambiente":
+                        print(f"⚠ {resultado['detalhe']}")
+                        print("Auditoria automática indisponível; salvando a questão sem validação.")
+                        break
+
+                    if resultado["sucesso"]:
+                        print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
+                        aprovado = True
+                        if tentativa == 1:
+                            pass_at_1 = True
+                        break
+
+            print(f"✗ Falhas detectadas:\n{diagnostico}")
+
+            if tentativa == MAX_TENTATIVAS:
+                print("\nLimite de tentativas atingido sem consistência técnica total.")
                 break
 
-            saida_auditor = str(tarefa_gabarito.output) if tarefa_gabarito.output else ""
-            gabarito_atual = extrair_codigo(saida_auditor, "GABARITO")
+            print("Enviando relatório de diagnóstico ao Especialista para correção...")
+            tarefa_correcao = criar_tarefa_correcao(
+                readme_atual, shell_atual, diagnostico,
+                contexto_usuario, exemplos, topicos_txt
+            )
+            crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
+            if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
+                break
 
-            if not gabarito_atual:
-                print("Auditor não retornou um bloco <<<GABARITO>>> válido. Início da resposta recebida:")
-                print(saida_auditor[:600] or "(resposta vazia — veja se o modelo esgotou os tokens 'pensando')")
-                diagnostico = "O Auditor Técnico não produziu uma solução de referência no formato esperado."
+            saida_correcao = str(tarefa_correcao.output) if tarefa_correcao.output else ""
+            novo_readme = extrair_bloco(saida_correcao, "README")
+            novo_shell  = extrair_codigo(saida_correcao, "SHELL")
+
+            if novo_readme and novo_shell and extrair_testes_readme(novo_readme):
+                readme_atual, shell_atual = novo_readme, novo_shell
             else:
-                # Garante que a função main do gabarito preserva rigorosamente a do esqueleto (regra de auditoria)
-                pos_main_shell = shell_atual.find("fun main")
-                pos_main_gab = gabarito_atual.find("fun main")
-                if pos_main_shell != -1 and pos_main_gab != -1:
-                    gabarito_atual = gabarito_atual[:pos_main_gab] + shell_atual[pos_main_shell:]
+                print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
 
-                print("Compilando (kotlinc pode demorar) e executando a solução contra os casos de teste do README...")
-                resultado = compilar_e_executar(gabarito_atual, extrair_testes_readme(readme_atual))
-                diagnostico = formatar_relatorio(resultado)
+    # ─── salvamento ─────────────────────────────────────────────────────────────
+    salvar_questao(pasta_base, nome_questao, readme_atual, gabarito_atual, shell_atual, entrada_usuario)
 
-                if resultado["etapa"] == "ambiente":
-                    print(f"⚠ {resultado['detalhe']}")
-                    print("Auditoria automática indisponível; salvando a questão sem validação.")
-                    break
+    pasta_q = pasta_base / nome_questao
+    if not aprovado:
+        log_path = pasta_q / "diagnostico_final.txt"
+        log_path.write_text(diagnostico, encoding="utf-8")
+        print(f"✗ Diagnóstico final salvo em: {log_path}")
 
-                if resultado["sucesso"]:
-                    print("✓ Compilação e todos os testes passaram — questão validada tecnicamente.")
-                    aprovado = True
-                    break
+    tempo_segundos = round(time.time() - t_inicio, 2)
 
-        print(f"✗ Falhas detectadas:\n{diagnostico}")
-
-        if tentativa == MAX_TENTATIVAS:
-            print("\nLimite de tentativas atingido sem consistência técnica total.")
-            break
-
-        print("Enviando relatório de diagnóstico ao Especialista para correção...")
-        tarefa_correcao = criar_tarefa_correcao(readme_atual, shell_atual, diagnostico,
-                                                contexto_usuario, exemplos, topicos_txt)
-        crew_correcao = Crew(agents=[especialista_poo], tasks=[tarefa_correcao], process=Process.sequential)
-        if not kickoff_seguro(crew_correcao, f"correção (tentativa {tentativa})"):
-            break
-
-        saida_correcao = str(tarefa_correcao.output) if tarefa_correcao.output else ""
-        novo_readme = extrair_bloco(saida_correcao, "README")
-        novo_shell  = extrair_codigo(saida_correcao, "SHELL")
-
-        if novo_readme and novo_shell and extrair_testes_readme(novo_readme):
-            readme_atual, shell_atual = novo_readme, novo_shell
-        else:
-            print("Correção incompleta recebida do Especialista; mantendo versão anterior para a próxima tentativa.")
+    return {
+        "aprovado": aprovado,
+        "pass_at_1": pass_at_1,
+        "tentativas_usadas": tentativas_usadas,
+        "tempo_segundos": tempo_segundos,
+        "custos": copy.deepcopy(registro_custos),
+        "caminhos": {
+            "pasta": str(pasta_q),
+            "readme": str(pasta_q / "README.md"),
+            "shell_kt": str(pasta_q / "src" / "kt" / "shell.kt"),
+            "main_kt": str(pasta_q / "src" / "kt" / "main.kt"),
+            "README.md": str(pasta_q / "README.md"),
+            "shell.kt": str(pasta_q / "src" / "kt" / "shell.kt"),
+            "main.kt": str(pasta_q / "src" / "kt" / "main.kt"),
+        }
+    }
 
 
-    # ─── salvamento (só no final, depois do ciclo) ───────────────────────────────
+def main():
+    # Input do usuario
+
+    print("=== Gerador de Questões POO (Kotlin) ===\n")
+    print("Tópicos disponíveis:", ", ".join(TOPICOS.keys()), "\n")
+    descricao = input(
+        "Descreva a questão (ex: '3 classes, com encapsulamento, mapas e exceções, no contexto de biblioteca'):\n> "
+    ).strip()
+    nome_questao = input("Nome da pasta de saída: ").strip().replace(" ", "_") or "questao"
+
+    print("\nAnalisando tópicos e carregando exemplos do repositório...")
+    topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm)
+    # Para fixar os tópicos manualmente (sem detecção automática), use:
+    # topicos, exemplos = preparar(descricao, CAMINHO_REPO, chamar_llm,
+    #                              topicos=["encapsulamento_invariantes", "mapas", "excecoes"])
+
+    confirma = input("\nContinuar com esses tópicos? [S/n] ").strip().lower()
+    if confirma == "n":
+        raise SystemExit(0)
+
+    resultado = executar_geracao(
+        descricao=descricao,
+        nome_questao=nome_questao,
+        topicos=topicos,
+        exemplos=exemplos,
+        pasta_base=Path(OUTPUT_DIR)
+    )
 
     status = (
         "APROVADA na auditoria técnica"
-        if aprovado
-        else f"NÃO validada após {MAX_TENTATIVAS} tentativas (recomenda-se revisão manual)"
+        if resultado["aprovado"]
+        else f"NÃO validada após {resultado['tentativas_usadas']} tentativas (recomenda-se revisão manual)"
     )
     print(f"\nStatus final da questão: {status}")
-
-    salvar_questao(OUTPUT_DIR, nome_questao, readme_atual, gabarito_atual, shell_atual, entrada_usuario)
-
-    if not aprovado:
-        log_path = Path(OUTPUT_DIR) / nome_questao / "diagnostico_final.txt"
-        log_path.write_text(diagnostico, encoding="utf-8")
-        print(f"✗ Diagnóstico final salvo em: {log_path}")
+    print(f"Tempo total: {resultado['tempo_segundos']}s | Pass@1: {resultado['pass_at_1']}")
+    print(f"Custo estimado: ${resultado['custos']['custo_usd']:.6f} USD ({resultado['custos']['total_tokens']} tokens)")
 
 
 if __name__ == "__main__":

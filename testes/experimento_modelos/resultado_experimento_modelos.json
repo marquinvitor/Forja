@@ -1,0 +1,597 @@
+{
+  "metadados": {
+    "data_execucao": "2026-11-23 17:34:18",
+    "tarifas_fallback_1m": {
+      "gemini-3.5-flash-lite": {
+        "input": 0.075,
+        "output": 0.3
+      },
+      "gemini/gemini-3.5-flash-lite": {
+        "input": 0.075,
+        "output": 0.3
+      },
+      "gemini-3.8-flash": {
+        "input": 0.15,
+        "output": 0.6
+      },
+      "gemini/gemini-3.8-flash": {
+        "input": 0.15,
+        "output": 0.6
+      }
+    },
+    "total_configuracoes": 3,
+    "total_niveis": 3
+  },
+  "configuracoes": {
+    "1_Leve_Homogenea": {
+      "metadados": {
+        "id": "1_Leve_Homogenea",
+        "nome": "1. Leve Homogênea (Flash-Lite x3)",
+        "descricao": "gemini-3.5-flash-lite nos 3 agentes (Designer, Especialista, Auditor)",
+        "designer": "gemini/gemini-3.5-flash-lite",
+        "especialista": "gemini/gemini-3.5-flash-lite",
+        "auditor": "gemini/gemini-3.5-flash-lite"
+      },
+      "resumo": {
+        "total_questoes": 3,
+        "aprovadas": 2,
+        "pass_at_1_count": 2,
+        "taxa_pass_at_1_pct": 66.7,
+        "taxa_aprovacao_final_pct": 66.7,
+        "media_tentativas": 0.67,
+        "tempo_total_s": 47.69,
+        "tempo_medio_s": 15.9,
+        "prompt_tokens_total": 29940,
+        "prompt_tokens_medio": 9980.0,
+        "completion_tokens_total": 13053,
+        "completion_tokens_medio": 4351.0,
+        "total_tokens": 42993,
+        "tokens_medio": 14331.0,
+        "custo_total_usd": 0.041615,
+        "custo_medio_usd": 0.013872,
+        "custo_efetivo_aprovada_usd": 0.020807,
+        "qualidade_estrutural": {
+          "esqueleto_valido_pct": 100.0,
+          "sem_println_dominio_pct": 100.0,
+          "possui_mermaid_pct": 66.7,
+          "media_qtd_testes": 3.3,
+          "testes_suficientes_pct": 66.7,
+          "taxa_geral_aderencia_pct": 83.3
+        }
+      },
+      "questoes": [
+        {
+          "nivel": "L1",
+          "nome_nivel": "L1_Simples",
+          "descricao_nivel": "1 tópico, 1 classe (Encapsulamento e Invariantes)",
+          "prompt": "1 classe, com encapsulamento e invariantes, no contexto de uma garrafa térmica inteligente que controla volume de líquido, capacidade máxima e temperatura, com métodos para abastecer e servir sem permitir transbordamento nem valores negativos",
+          "topicos": [
+            "encapsulamento_invariantes"
+          ],
+          "aprovado": false,
+          "pass_at_1": false,
+          "tentativas_usadas": 0,
+          "tempo_segundos": 10.6,
+          "custos": {
+            "prompt_tokens": 8384,
+            "completion_tokens": 3745,
+            "total_tokens": 12129,
+            "custo_usd": 0.011877700000000001,
+            "chamadas": 3,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 8384,
+                "completion_tokens": 3745,
+                "total_tokens": 12129,
+                "custo_usd": 0.011877700000000001,
+                "chamadas": 3
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": false,
+            "qtd_testes": 0,
+            "testes_suficientes": false
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L1/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L2",
+          "nome_nivel": "L2_Medio",
+          "descricao_nivel": "2 tópicos, 2 classes (Encapsulamento e Coleções Lineares)",
+          "prompt": "2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "colecoes_lineares"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 17.49,
+          "custos": {
+            "prompt_tokens": 10376,
+            "completion_tokens": 4196,
+            "total_tokens": 14572,
+            "custo_usd": 0.013602800000000002,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 10376,
+                "completion_tokens": 4196,
+                "total_tokens": 14572,
+                "custo_usd": 0.013602800000000002,
+                "chamadas": 4
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 5,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L2/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L3",
+          "nome_nivel": "L3_Complexo",
+          "descricao_nivel": "3 tópicos, 3 classes (Encapsulamento, Mapas e Exceções)",
+          "prompt": "3 classes, com encapsulamento, mapas e exceções, no contexto de uma biblioteca de bairro que empresta livros para sócios, com limite de empréstimos por sócio e livros que podem estar indisponíveis",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "excecoes",
+            "mapas"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 19.6,
+          "custos": {
+            "prompt_tokens": 11180,
+            "completion_tokens": 5112,
+            "total_tokens": 16292,
+            "custo_usd": 0.016134000000000003,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 11180,
+                "completion_tokens": 5112,
+                "total_tokens": 16292,
+                "custo_usd": 0.016134000000000003,
+                "chamadas": 4
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 5,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/1_Leve_Homogenea/L3/src/kt/main.kt"
+          }
+        }
+      ]
+    },
+    "2_Hibrida_Proposta": {
+      "metadados": {
+        "id": "2_Hibrida_Proposta",
+        "nome": "2. Híbrida Proposta (Flash-Lite + Flash + Flash-Lite)",
+        "descricao": "gemini-3.5-flash-lite no Designer e Auditor, e gemini-3.8-flash no Especialista",
+        "designer": "gemini/gemini-3.5-flash-lite",
+        "especialista": "gemini/gemini-3.8-flash",
+        "auditor": "gemini/gemini-3.5-flash-lite"
+      },
+      "resumo": {
+        "total_questoes": 3,
+        "aprovadas": 3,
+        "pass_at_1_count": 3,
+        "taxa_pass_at_1_pct": 100.0,
+        "taxa_aprovacao_final_pct": 100.0,
+        "media_tentativas": 1.0,
+        "tempo_total_s": 293.48,
+        "tempo_medio_s": 97.83,
+        "prompt_tokens_total": 39003,
+        "prompt_tokens_medio": 13001.0,
+        "completion_tokens_total": 39044,
+        "completion_tokens_medio": 13014.7,
+        "total_tokens": 78047,
+        "tokens_medio": 26015.7,
+        "custo_total_usd": 0.159029,
+        "custo_medio_usd": 0.05301,
+        "custo_efetivo_aprovada_usd": 0.05301,
+        "qualidade_estrutural": {
+          "esqueleto_valido_pct": 100.0,
+          "sem_println_dominio_pct": 100.0,
+          "possui_mermaid_pct": 100.0,
+          "media_qtd_testes": 5.7,
+          "testes_suficientes_pct": 100.0,
+          "taxa_geral_aderencia_pct": 100.0
+        }
+      },
+      "questoes": [
+        {
+          "nivel": "L1",
+          "nome_nivel": "L1_Simples",
+          "descricao_nivel": "1 tópico, 1 classe (Encapsulamento e Invariantes)",
+          "prompt": "1 classe, com encapsulamento e invariantes, no contexto de uma garrafa térmica inteligente que controla volume de líquido, capacidade máxima e temperatura, com métodos para abastecer e servir sem permitir transbordamento nem valores negativos",
+          "topicos": [
+            "encapsulamento_invariantes"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 63.38,
+          "custos": {
+            "prompt_tokens": 12024,
+            "completion_tokens": 7993,
+            "total_tokens": 20017,
+            "custo_usd": 0.034288650000000004,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 4843,
+                "completion_tokens": 2019,
+                "total_tokens": 6862,
+                "custo_usd": 0.0065004,
+                "chamadas": 2
+              },
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 7181,
+                "completion_tokens": 5974,
+                "total_tokens": 13155,
+                "custo_usd": 0.027788250000000004,
+                "chamadas": 2
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 6,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L1/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L2",
+          "nome_nivel": "L2_Medio",
+          "descricao_nivel": "2 tópicos, 2 classes (Encapsulamento e Coleções Lineares)",
+          "prompt": "2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "colecoes_lineares"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 119.01,
+          "custos": {
+            "prompt_tokens": 12248,
+            "completion_tokens": 15836,
+            "total_tokens": 28084,
+            "custo_usd": 0.06341655000000002,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 5296,
+                "completion_tokens": 2217,
+                "total_tokens": 7513,
+                "custo_usd": 0.0071313,
+                "chamadas": 2
+              },
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 6952,
+                "completion_tokens": 13619,
+                "total_tokens": 20571,
+                "custo_usd": 0.05628525000000001,
+                "chamadas": 2
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 5,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L2/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L3",
+          "nome_nivel": "L3_Complexo",
+          "descricao_nivel": "3 tópicos, 3 classes (Encapsulamento, Mapas e Exceções)",
+          "prompt": "3 classes, com encapsulamento, mapas e exceções, no contexto de uma biblioteca de bairro que empresta livros para sócios, com limite de empréstimos por sócio e livros que podem estar indisponíveis",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "excecoes",
+            "mapas"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 111.09,
+          "custos": {
+            "prompt_tokens": 14731,
+            "completion_tokens": 15215,
+            "total_tokens": 29946,
+            "custo_usd": 0.061324100000000006,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.5-flash-lite": {
+                "prompt_tokens": 6062,
+                "completion_tokens": 3242,
+                "total_tokens": 9304,
+                "custo_usd": 0.009923600000000001,
+                "chamadas": 2
+              },
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 8669,
+                "completion_tokens": 11973,
+                "total_tokens": 20642,
+                "custo_usd": 0.0514005,
+                "chamadas": 2
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 6,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/2_Hibrida_Proposta/L3/src/kt/main.kt"
+          }
+        }
+      ]
+    },
+    "3_Robusta_Homogenea": {
+      "metadados": {
+        "id": "3_Robusta_Homogenea",
+        "nome": "3. Robusta Homogênea (Flash x3)",
+        "descricao": "gemini-3.8-flash nos 3 agentes (Designer, Especialista, Auditor)",
+        "designer": "gemini/gemini-3.8-flash",
+        "especialista": "gemini/gemini-3.8-flash",
+        "auditor": "gemini/gemini-3.8-flash"
+      },
+      "resumo": {
+        "total_questoes": 3,
+        "aprovadas": 3,
+        "pass_at_1_count": 3,
+        "taxa_pass_at_1_pct": 100.0,
+        "taxa_aprovacao_final_pct": 100.0,
+        "media_tentativas": 1.0,
+        "tempo_total_s": 464.31,
+        "tempo_medio_s": 154.77,
+        "prompt_tokens_total": 40897,
+        "prompt_tokens_medio": 13632.3,
+        "completion_tokens_total": 55339,
+        "completion_tokens_medio": 18446.3,
+        "total_tokens": 96236,
+        "tokens_medio": 32078.7,
+        "custo_total_usd": 0.238194,
+        "custo_medio_usd": 0.079398,
+        "custo_efetivo_aprovada_usd": 0.079398,
+        "qualidade_estrutural": {
+          "esqueleto_valido_pct": 100.0,
+          "sem_println_dominio_pct": 100.0,
+          "possui_mermaid_pct": 100.0,
+          "media_qtd_testes": 5.3,
+          "testes_suficientes_pct": 100.0,
+          "taxa_geral_aderencia_pct": 100.0
+        }
+      },
+      "questoes": [
+        {
+          "nivel": "L1",
+          "nome_nivel": "L1_Simples",
+          "descricao_nivel": "1 tópico, 1 classe (Encapsulamento e Invariantes)",
+          "prompt": "1 classe, com encapsulamento e invariantes, no contexto de uma garrafa térmica inteligente que controla volume de líquido, capacidade máxima e temperatura, com métodos para abastecer e servir sem permitir transbordamento nem valores negativos",
+          "topicos": [
+            "encapsulamento_invariantes"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 104.36,
+          "custos": {
+            "prompt_tokens": 13240,
+            "completion_tokens": 11628,
+            "total_tokens": 24868,
+            "custo_usd": 0.053535000000000006,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 13240,
+                "completion_tokens": 11628,
+                "total_tokens": 24868,
+                "custo_usd": 0.053535000000000006,
+                "chamadas": 4
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 5,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L1/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L2",
+          "nome_nivel": "L2_Medio",
+          "descricao_nivel": "2 tópicos, 2 classes (Encapsulamento e Coleções Lineares)",
+          "prompt": "2 classes, com encapsulamento e coleções lineares, no contexto de um carrinho de compras de uma padaria artesanal que armazena uma lista de itens com controle de quantidade máxima e cálculo do valor total",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "colecoes_lineares"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 153.13,
+          "custos": {
+            "prompt_tokens": 14604,
+            "completion_tokens": 18998,
+            "total_tokens": 33602,
+            "custo_usd": 0.0821955,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 14604,
+                "completion_tokens": 18998,
+                "total_tokens": 33602,
+                "custo_usd": 0.0821955,
+                "chamadas": 4
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 5,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L2/src/kt/main.kt"
+          }
+        },
+        {
+          "nivel": "L3",
+          "nome_nivel": "L3_Complexo",
+          "descricao_nivel": "3 tópicos, 3 classes (Encapsulamento, Mapas e Exceções)",
+          "prompt": "3 classes, com encapsulamento, mapas e exceções, no contexto de uma biblioteca de bairro que empresta livros para sócios, com limite de empréstimos por sócio e livros que podem estar indisponíveis",
+          "topicos": [
+            "encapsulamento_invariantes",
+            "excecoes",
+            "mapas"
+          ],
+          "aprovado": true,
+          "pass_at_1": true,
+          "tentativas_usadas": 1,
+          "tempo_segundos": 206.82,
+          "custos": {
+            "prompt_tokens": 13053,
+            "completion_tokens": 24713,
+            "total_tokens": 37766,
+            "custo_usd": 0.10246350000000001,
+            "chamadas": 4,
+            "por_modelo": {
+              "gemini/gemini-3.8-flash": {
+                "prompt_tokens": 13053,
+                "completion_tokens": 24713,
+                "total_tokens": 37766,
+                "custo_usd": 0.10246350000000001,
+                "chamadas": 4
+              }
+            }
+          },
+          "qualidade_estrutural": {
+            "esqueleto_valido": true,
+            "detalhe_esqueleto": "Esqueleto conforme: todos os métodos das classes contêm TODO.",
+            "sem_println_dominio": true,
+            "violacoes_println": [],
+            "possui_mermaid": true,
+            "qtd_testes": 6,
+            "testes_suficientes": true
+          },
+          "caminhos": {
+            "pasta": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3",
+            "readme": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/README.md",
+            "shell_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/src/kt/shell.kt",
+            "main_kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/src/kt/main.kt",
+            "README.md": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/README.md",
+            "shell.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/src/kt/shell.kt",
+            "main.kt": "/home/marco/QuestionCreate/output/experimento_modelos/3_Robusta_Homogenea/L3/src/kt/main.kt"
+          }
+        }
+      ]
+    }
+  }
+}

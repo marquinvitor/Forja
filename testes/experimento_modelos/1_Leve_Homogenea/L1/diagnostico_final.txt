@@ -1,0 +1,1 @@
+Falha na geração inicial: blocos README/SHELL ausentes ou sem testes válidos.
